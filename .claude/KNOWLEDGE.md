@@ -48,6 +48,15 @@ debugging build, permission, or CI problems.
   `CAPIError: 400 The requested model is not supported` — that is GitHub's
   backend, not our code. Don't debug it here.
 - Dependabot covers `github-actions` and `swift` ecosystems weekly.
+- **macOS runner pool is tiny (personal account ~5 concurrent)** and a CodeQL
+  Swift scan holds one for ~30 min. Uncancelled/duplicate scans once starved
+  CI Build jobs into an indefinite queue. Rules now enforced in codeql.yml:
+  paths filter (Swift/build inputs only), concurrency cancel-in-progress,
+  weekly full scan. If Build sits "queued" for many minutes, suspect runner
+  starvation — `gh run list` and cancel redundant scans first.
+- Release publishing is `.github/workflows/release.yml` on `v*` tags: guard
+  (tag == AppInfo.version) → test → signed build → zip + sha256 → release with
+  generated notes. v1.1.0 published this way and verified end-to-end.
 
 ## Provider integration notes (TranslationService)
 
