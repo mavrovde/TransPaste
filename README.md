@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/mavrovde/TransPaste/actions/workflows/ci.yml/badge.svg)](https://github.com/mavrovde/TransPaste/actions/workflows/ci.yml)
 
-A lightweight macOS **menu bar app** that translates text on the fly using **your choice of AI provider — Google Gemini, OpenAI, or Anthropic Claude**. Press a global hotkey, confirm the captured text, and the translated result is pasted right back into your active application — no window switching required.
+A lightweight macOS **menu bar app** that translates text on the fly using **your choice of AI provider — Google Gemini, OpenAI, Anthropic Claude, local Ollama, or any OpenAI-compatible endpoint**. Press a global hotkey, confirm the captured text, and the translated result is pasted right back into your active application — no window switching required.
 
 ---
 
@@ -31,7 +31,7 @@ translator/
 │   ├── main.swift                  # App entry point — creates NSApplication
 │   ├── AppDelegate.swift           # Menu bar UI, language selection, permission prompts
 │   ├── InputMonitor.swift          # Carbon hotkey registration, text capture macro
-│   ├── TranslationService.swift    # Multi-provider REST client (Gemini, OpenAI, Claude)
+│   ├── TranslationService.swift    # Multi-provider REST client (Gemini, OpenAI, Claude, Ollama, custom)
 │   └── Logger.swift                # Thread-safe singleton file logger
 ├── Tests/
 │   ├── TestKit.swift               # Minimal XCTest-free test harness
@@ -39,10 +39,11 @@ translator/
 │   ├── TranslationServiceTests.swift
 │   ├── InputMonitorTests.swift
 │   └── LoggerTests.swift
-├── .github/workflows/ci.yml        # CI: build → test → package
+├── .github/workflows/              # CI (build → test → package), CodeQL, release publishing
 ├── Info.plist                      # App bundle metadata (LSUIElement = true)
 ├── Package.swift                   # Swift Package Manager manifest
 ├── build.sh                        # Compiles and code-signs the .app bundle
+├── package_dmg.sh                  # Builds the drag-to-Applications DMG installer
 ├── test.sh                         # Compiles and runs the test suite
 ├── automated_setup.sh              # Guides permission setup via Terminal
 └── .env.example                    # Template for API key environment variable
@@ -75,7 +76,7 @@ graph LR
 
 - **macOS 13 (Ventura)** or later
 - **Swift 5.9+** — the Xcode **Command Line Tools are sufficient** (`xcode-select --install`); full Xcode is not required
-- **An API key** for at least one provider: [Google Gemini](https://aistudio.google.com/app/apikey), [OpenAI](https://platform.openai.com/api-keys), or [Anthropic Claude](https://console.anthropic.com/settings/keys)
+- **An API key** for at least one provider: [Google Gemini](https://aistudio.google.com/app/apikey), [OpenAI](https://platform.openai.com/api-keys), or [Anthropic Claude](https://console.anthropic.com/settings/keys) — or none: local Ollama and most custom OpenAI-compatible endpoints work key-less
 - **Accessibility + Input Monitoring permissions** (the app prompts you on first launch)
 
 ---
@@ -84,7 +85,7 @@ graph LR
 
 ### Option 1 — Download a Release (easiest)
 
-Grab the latest `TransPaste-<version>.zip` from the [Releases page](https://github.com/mavrovde/TransPaste/releases), unzip, and launch. The app is ad-hoc signed, so on first launch right-click → **Open** (or `xattr -d com.apple.quarantine TransPaste.app`). Then continue at step 4 below for permissions.
+Grab the latest `TransPaste-<version>.dmg` from the [Releases page](https://github.com/mavrovde/TransPaste/releases), open it, and drag **TransPaste** to **Applications** (a zip is also published if you prefer). The app is ad-hoc signed, so on first launch right-click → **Open** (or `xattr -d com.apple.quarantine /Applications/TransPaste.app`). Then continue at step 4 below for permissions.
 
 ### Option 2 — Build from Source
 
@@ -92,7 +93,7 @@ Grab the latest `TransPaste-<version>.zip` from the [Releases page](https://gith
 
 ```bash
 git clone https://github.com/mavrovde/TransPaste.git
-cd translator
+cd TransPaste
 ```
 
 ### 2. Set Up Your API Key
@@ -222,9 +223,9 @@ Every push and pull request to `main` runs the [CI workflow](.github/workflows/c
 
 1. **Build** — compiles the app bundle and verifies the code signature
 2. **Test** — runs the full test suite
-3. **Package** — zips `TransPaste.app` and uploads it as a downloadable artifact (30-day retention)
+3. **Package** — zips `TransPaste.app`, builds the DMG installer, and uploads both as downloadable artifacts (30-day retention)
 
-Pushing a `v*` tag additionally runs the [Release workflow](.github/workflows/release.yml): it verifies the tag matches `AppInfo.version`, re-runs tests and the signed build, and publishes a GitHub release with the zipped app, a SHA-256 checksum, and auto-generated notes.
+Pushing a `v*` tag additionally runs the [Release workflow](.github/workflows/release.yml): it verifies the tag matches `AppInfo.version`, re-runs tests and the signed build, and publishes a GitHub release with the DMG installer, the zipped app, SHA-256 checksums, and auto-generated notes.
 
 ### Project Configuration
 
@@ -234,6 +235,7 @@ Pushing a `v*` tag additionally runs the [Release workflow](.github/workflows/re
 | `Sources/AppInfo.swift` | Single source of the app version — `build.sh` injects it into the bundle's Info.plist |
 | `Info.plist` | Bundle ID: `com.mavrovde.translator`, `LSUIElement: true` (no Dock icon) |
 | `.gitignore` | Ignores `build/`, `.build/`, Xcode artifacts, logs, and `.env` |
+| `package_dmg.sh` | Builds the drag-to-Applications `TransPaste-<version>.dmg` (used by CI and releases) |
 
 ### API Key Priority
 

@@ -16,9 +16,10 @@ gh release download "$TAG" --dir "$DIR"
 
 Checks, all must pass:
 
-1. **Assets**: exactly `TransPaste-$V.zip` and `TransPaste-$V.zip.sha256`.
-2. **Checksum**: `cd "$DIR" && shasum -a 256 -c "TransPaste-$V.zip.sha256"`.
-3. **Signature**: `ditto -x -k "TransPaste-$V.zip" . && codesign --verify --verbose TransPaste.app`.
+1. **Assets**: exactly `TransPaste-$V.dmg`, `TransPaste-$V.zip`, and their `.sha256` files.
+2. **Checksums**: `cd "$DIR" && shasum -a 256 -c "TransPaste-$V.zip.sha256" && shasum -a 256 -c "TransPaste-$V.dmg.sha256"`.
+3. **Signature (zip)**: `ditto -x -k "TransPaste-$V.zip" . && codesign --verify --verbose TransPaste.app`.
+3b. **DMG**: `hdiutil attach "TransPaste-$V.dmg" -nobrowse` → volume contains `TransPaste.app` (signed, verify as above) and an `Applications` symlink → `hdiutil detach`.
 4. **Version**: `plutil -p TransPaste.app/Contents/Info.plist | grep CFBundleShortVersionString` equals `$V`; also matches `Sources/AppInfo.swift` at that tag (`git show "$TAG:Sources/AppInfo.swift" | grep version`).
 5. **Notes**: `gh release view "$TAG"` body contains the Installation footer
    (Gatekeeper instructions) and, if the bundle ID/signing changed in this

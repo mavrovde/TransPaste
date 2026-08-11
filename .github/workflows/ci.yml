@@ -55,10 +55,15 @@ jobs:
       - name: Zip app bundle
         run: ditto -c -k --keepParent build/TransPaste.app build/TransPaste.app.zip
 
-      - name: Upload artifact
+      - name: Build DMG installer
+        run: ./package_dmg.sh
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
           name: TransPaste.app
-          path: build/TransPaste.app.zip
+          path: |
+            build/TransPaste.app.zip
+            build/TransPaste-*.dmg
           retention-days: 30
           if-no-files-found: error

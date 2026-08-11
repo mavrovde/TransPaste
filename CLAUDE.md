@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-**TransPaste** — a macOS menu bar app (Swift, AppKit, no Xcode project) that captures selected text via a global hotkey (`Ctrl+Cmd+T`), translates it with the Google Gemini API, and pastes the result back into the active app. Requires macOS 13+. Repo is `mavrovde/TransPaste`; the app/bundle name is TransPaste.
+**TransPaste** — a macOS menu bar app (Swift, AppKit, no Xcode project) that captures selected text via a global hotkey (`Ctrl+Cmd+T`), translates it with the selected AI provider (Gemini, OpenAI, Claude, local Ollama, or any custom OpenAI-compatible endpoint), and pastes the result back into the active app. Requires macOS 13+. Repo is `mavrovde/TransPaste`; the app/bundle name is TransPaste.
 
 ## Commands
 
@@ -12,6 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./build.sh          # Compiles Sources/*.swift with swiftc -O into build/TransPaste.app, copies Info.plist, ad-hoc codesigns
 ./test.sh           # Compiles and runs the full test suite
 ./test.sh "API key" # Run only tests whose name matches the filter (case-insensitive substring)
+./package_dmg.sh    # Builds build/TransPaste-<version>.dmg (drag-to-Applications installer; runs build.sh if needed)
 swift build         # SPM build (bare executable in .build/ — not an .app bundle, permissions won't work)
 open build/TransPaste.app          # Launch (menu bar icon only; LSUIElement=true, no Dock icon)
 ./automated_setup.sh # Resets TCC permissions (tccutil) and guides re-granting Accessibility + Input Monitoring
@@ -43,6 +44,6 @@ The `asyncAfter` delays in the macro and the 0.5s pause between hiding the app a
 
 - **UserDefaults keys are version-suffixed** (`SourceLanguageV3`, `TargetLanguageV3`, `IsTranslationEnabledV2`, `TranslationProviderV1`) — bump the suffix when changing a preference's default/semantics rather than migrating values.
 - **Ad-hoc code signing in build.sh is load-bearing**: it stabilizes bundle identity so TCC grants survive rebuilds. Changing `CFBundleIdentifier` (`com.mavrovde.transpaste`) invalidates existing grants — users must re-run `./automated_setup.sh`.
-- CI (`.github/workflows/ci.yml`) runs build → test → package stages on macOS runners; package uploads a zipped `TransPaste.app` artifact.
+- CI (`.github/workflows/ci.yml`) runs build → test → package stages on macOS runners; package uploads the zipped `TransPaste.app` and the DMG installer as artifacts. Releases (`v*` tags) publish DMG + zip + sha256s automatically.
 
 - Project agents, skills, and the accumulated known-issues knowledge base live in `.claude/` — read `.claude/KNOWLEDGE.md` before debugging build, permission, or CI problems.
