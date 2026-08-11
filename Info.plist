@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.user.on-fly-translator</string>
+    <string>com.mavrovde.transpaste</string>
     <key>CFBundleName</key>
-    <string>on-fly-translator</string>
+    <string>TransPaste</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSPrincipalClass</key>

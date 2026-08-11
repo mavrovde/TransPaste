@@ -1,13 +1,13 @@
 #!/bin/bash
 
-APP_PATH="$(pwd)/build/on-fly-translator.app"
-BUNDLE_ID="com.user.on-fly-translator"
+APP_PATH="$(pwd)/build/TransPaste.app"
+BUNDLE_ID="com.mavrovde.transpaste"
 
 echo "=== Automating Permission Setup ==="
 
 # 1. Kill App
 echo "1. Closing App..."
-pkill -9 on-fly-translator
+pkill -9 -x TransPaste
 
 # 2. Reset Permissions
 echo "2. Resetting Permissions for ${BUNDLE_ID}..."
@@ -26,7 +26,7 @@ open -R "${APP_PATH}"
 echo ""
 echo "!!! ACTION REQUIRED !!!"
 echo "---------------------------------------------------"
-echo "1. Drag 'on-fly-translator' from the FINDER window..."
+echo "1. Drag 'TransPaste' from the FINDER window..."
 echo "2. ...into the SYSTEM SETTINGS window list."
 echo "3. Make sure the toggle is ON."
 echo "---------------------------------------------------"

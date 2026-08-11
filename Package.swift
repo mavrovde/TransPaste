@@ -1,23 +1,21 @@
 // swift-tools-version: 5.9
 import PackageDescription
 
+// Tests are not an SPM testTarget: they use a self-contained harness
+// (Tests/TestKit.swift) instead of XCTest, so they run on machines with only
+// Command Line Tools installed. Run them with ./test.sh.
 let package = Package(
-    name: "on-fly-translator",
+    name: "TransPaste",
     platforms: [
         .macOS(.v13)
     ],
     products: [
-        .executable(name: "on-fly-translator", targets: ["on-fly-translator"])
+        .executable(name: "TransPaste", targets: ["TransPaste"])
     ],
     targets: [
         .executableTarget(
-            name: "on-fly-translator",
+            name: "TransPaste",
             path: "Sources"
-        ),
-        .testTarget(
-            name: "on-fly-translator-tests",
-            dependencies: ["on-fly-translator"],
-            path: "Tests"
         )
     ]
 )

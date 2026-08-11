@@ -33,11 +33,12 @@ struct GeminiResponse: Codable {
     struct Candidate: Codable {
         struct Content: Codable {
             struct Part: Codable {
-                let text: String
+                let text: String?
             }
-            let parts: [Part]
+            let parts: [Part]?
         }
-        let content: Content
+        // Optional: candidates blocked by safety filters arrive without content
+        let content: Content?
     }
     let candidates: [Candidate]?
     let error: APIError?
@@ -64,36 +65,26 @@ public class GoogleGeminiService {
     // Internal helper for testing - actually needs to be public if we test from another module
     public func makeRequest(text: String, from sourceLang: String, to targetLang: String, apiKey: String) -> URLRequest? {
         // Using 'gemini-flash-latest' as it was explicitly listed in the API capabilities for this key
-        let urlString = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=\(apiKey)"
+        let urlString = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
         guard let url = URL(string: urlString) else { return nil }
-        
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        // Construct JSON Body for Gemini
-        // Body format: { "contents": [{ "parts": [{"text": "..."}] }] }
-        
+        // Header keeps the key out of URLs, which get logged by proxies and servers
+        request.addValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
+
         let prompt: String
         if sourceLang == "Auto" {
             prompt = "Translate the following text to \(targetLang). Only provide the translated text, no explanations or quotes:\n\n\(text)"
         } else {
             prompt = "Translate the following text from \(sourceLang) to \(targetLang). Only provide the translated text, no explanations or quotes:\n\n\(text)"
         }
-        
-        let json: [String: Any] = [
-            "contents": [
-                [
-                    "parts": [
-                        ["text": prompt]
-                    ]
-                ]
-            ]
-        ]
-        
-        guard let httpBody = try? JSONSerialization.data(withJSONObject: json, options: []) else { return nil }
+
+        let body = GeminiRequest(contents: [.init(parts: [.init(text: prompt)])])
+        guard let httpBody = try? JSONEncoder().encode(body) else { return nil }
         request.httpBody = httpBody
-        
+
         return request
     }
 
@@ -124,22 +115,17 @@ public class GoogleGeminiService {
                 return
             }
             
-            // Debug: Print raw response if it fails
-            if let responseStr = String(data: data, encoding: .utf8) {
-                // print("Raw Response: \(responseStr)") // Uncomment for debug
-            }
-            
             do {
                 let geminiResponse = try JSONDecoder().decode(GeminiResponse.self, from: data)
                 
                 if let apiError = geminiResponse.error {
                     let msg = "API Error: \(apiError.message)"
-                    print(msg)
+                    Logger.shared.log(msg)
                     completion(.failure(.apiError(msg)))
                     return
                 }
                 
-                if let text = geminiResponse.candidates?.first?.content.parts.first?.text {
+                if let text = geminiResponse.candidates?.first?.content?.parts?.first?.text {
                     completion(.success(text.trimmingCharacters(in: .whitespacesAndNewlines)))
                 } else {
                     completion(.failure(.apiError("No candidates returned")))

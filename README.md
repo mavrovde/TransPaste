@@ -1,6 +1,8 @@
-# 🌐 On-Fly Translator
+# 🌐 TransPaste
 
-A lightweight macOS **menu bar application** that translates text on-the-fly using the **Google Gemini API**. Press a global hotkey, confirm the captured text, and the translated result is pasted right back into your active application — no window switching required.
+[![CI](https://github.com/mavrovde/TransPaste/actions/workflows/ci.yml/badge.svg)](https://github.com/mavrovde/TransPaste/actions/workflows/ci.yml)
+
+A lightweight macOS **menu bar app** that translates text on the fly using the **Google Gemini API**. Press a global hotkey, confirm the captured text, and the translated result is pasted right back into your active application — no window switching required.
 
 ---
 
@@ -10,33 +12,37 @@ A lightweight macOS **menu bar application** that translates text on-the-fly usi
 |---|---|
 | **Global Hotkey** | `Ctrl + Cmd + T` triggers translation from any application |
 | **AI-Powered Translation** | Uses Google Gemini Flash for fast, accurate translations |
-| **Smart Text Capture** | Attempts the Accessibility API first, falls back to clipboard-based Select All → Copy macro |
+| **Smart Text Capture** | Attempts the Accessibility API first, falls back to a clipboard-based Select All → Copy macro |
 | **Confirmation Dialogs** | Shows captured text for review before translating, and the result before pasting |
 | **Multi-Language Support** | English, Spanish, French, German, Chinese, Japanese, Russian + Auto-detect |
 | **Menu Bar Integration** | Lives in the macOS menu bar — no Dock icon, no main window |
 | **Persistent Preferences** | Remembers source/target language and enabled state across launches |
 | **File Logging** | All operations logged to `~/translator.log` for debugging |
+| **No Xcode Required** | Builds and tests with Command Line Tools only |
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-on-fly-translator/
+translator/
 ├── Sources/
 │   ├── main.swift                  # App entry point — creates NSApplication
 │   ├── AppDelegate.swift           # Menu bar UI, language selection, permission prompts
 │   ├── InputMonitor.swift          # Carbon hotkey registration, text capture macro
 │   ├── GoogleGeminiService.swift   # Gemini REST API client
-│   └── Logger.swift                # Singleton file logger
+│   └── Logger.swift                # Thread-safe singleton file logger
 ├── Tests/
+│   ├── TestKit.swift               # Minimal XCTest-free test harness
+│   ├── TestMain.swift              # Test runner entry point
 │   ├── GoogleGeminiServiceTests.swift
 │   ├── InputMonitorTests.swift
 │   └── LoggerTests.swift
+├── .github/workflows/ci.yml        # CI: build → test → package
 ├── Info.plist                      # App bundle metadata (LSUIElement = true)
 ├── Package.swift                   # Swift Package Manager manifest
 ├── build.sh                        # Compiles and code-signs the .app bundle
-├── test.sh                         # Compiles and runs unit tests
+├── test.sh                         # Compiles and runs the test suite
 ├── automated_setup.sh              # Guides permission setup via Terminal
 └── .env.example                    # Template for API key environment variable
 ```
@@ -59,15 +65,15 @@ graph LR
 |---|---|
 | **`AppDelegate`** | Menu bar setup, language settings UI, permission checks, translation dialog flow |
 | **`InputMonitor`** | Registers `Ctrl+Cmd+T` via the Carbon `EventHotKey` API, captures text via the Accessibility API or clipboard macro, coordinates paste-back |
-| **`GoogleGeminiService`** | Builds and sends requests to the Gemini `generateContent` endpoint, parses JSON responses |
-| **`Logger`** | Thread-safe singleton that appends timestamped messages to `~/translator.log` |
+| **`GoogleGeminiService`** | Builds and sends requests to the Gemini `generateContent` endpoint (API key sent via the `x-goog-api-key` header, never in the URL), parses JSON responses |
+| **`Logger`** | Thread-safe singleton that appends timestamped messages to `~/translator.log` from any queue |
 
 ---
 
 ## 📋 Requirements
 
 - **macOS 13 (Ventura)** or later
-- **Swift 5.9+** (ships with Xcode 15+)
+- **Swift 5.9+** — the Xcode **Command Line Tools are sufficient** (`xcode-select --install`); full Xcode is not required
 - **Google Gemini API Key** — [get one here](https://aistudio.google.com/app/apikey)
 - **Accessibility + Input Monitoring permissions** (the app prompts you on first launch)
 
@@ -78,8 +84,8 @@ graph LR
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/mavrovde/on-fly-translator.git
-cd on-fly-translator
+git clone https://github.com/mavrovde/TransPaste.git
+cd translator
 ```
 
 ### 2. Set Up Your API Key
@@ -106,7 +112,7 @@ After launching the app, copy your API key to the clipboard and click **"Paste A
 
 This will:
 1. Compile all Swift source files with optimizations (`-O`)
-2. Create the app bundle at `build/on-fly-translator.app`
+2. Create the app bundle at `build/TransPaste.app`
 3. Copy `Info.plist` into the bundle
 4. Ad-hoc code-sign the bundle for stable identity
 
@@ -130,15 +136,15 @@ This script resets existing permissions, opens System Settings to the correct pa
 **Manual setup:**
 
 1. Open **System Settings → Privacy & Security → Input Monitoring**
-2. Add and enable `on-fly-translator.app`
+2. Add and enable `TransPaste.app`
 3. Open **System Settings → Privacy & Security → Accessibility**
-4. Add and enable `on-fly-translator.app`
-5. Launch the app: `open build/on-fly-translator.app`
+4. Add and enable `TransPaste.app`
+5. Launch the app: `open build/TransPaste.app`
 
 ### 5. Launch
 
 ```bash
-open build/on-fly-translator.app
+open build/TransPaste.app
 ```
 
 Look for the 💬 speech bubble icon in your menu bar.
@@ -162,9 +168,9 @@ Look for the 💬 speech bubble icon in your menu bar.
 
 | Menu Item | Action |
 |---|---|
-| **Source: \<language\>** | Choose the input language (or Auto-detect) |
-| **Target: \<language\>** | Choose the output language |
-| **Enable Translation** | Toggle the hotkey on/off (`Ctrl+Cmd+T`) |
+| **Source: \<language\>** | Choose the input language (or Auto-detect). Default: Russian |
+| **Target: \<language\>** | Choose the output language. Default: German |
+| **Enable Translation** | Toggle the hotkey on/off (`Ctrl+Cmd+T`) — the menu bar icon dims while disabled |
 | **Paste API Key from Clipboard** | Save the Gemini API key from your clipboard |
 | **Get API Key…** | Opens the Google AI Studio API key page |
 | **Check Permissions** | Re-checks Accessibility permissions and starts the input monitor |
@@ -177,34 +183,44 @@ Look for the 💬 speech bubble icon in your menu bar.
 ### Running Tests
 
 ```bash
-./test.sh
+./test.sh              # run all tests
+./test.sh "API key"    # run only tests whose name matches a filter
 ```
 
-The test script compiles `GoogleGeminiService.swift`, `Logger.swift`, and the test files into a standalone test binary, then executes it. Test coverage includes:
+Tests use a **self-contained harness** (`Tests/TestKit.swift`) instead of XCTest, so they run on machines with only Command Line Tools installed. Coverage includes:
 
-- **`GoogleGeminiServiceTests`** — request body construction, missing API key error  
-- **`InputMonitorTests`** — initialization state, hotkey handling  
-- **`LoggerTests`** — singleton identity, file write verification  
+- **`GoogleGeminiServiceTests`** — request construction (API key in header, prompt building for explicit and auto-detect modes) and every `translate()` result path (success, API error, missing candidates, safety-blocked candidates, malformed JSON, missing API key) via a mocked `URLSession`
+- **`InputMonitorTests`** — initial state, disabled-hotkey guard
+- **`LoggerTests`** — singleton identity, file writes, concurrent logging
+
+> [!NOTE]
+> The hotkey registration and capture macro require real Accessibility/Input Monitoring permissions and a focused target app, so the end-to-end flow is verified manually via the built app.
 
 ### Building with Swift Package Manager
 
 While `build.sh` uses `swiftc` directly for simplicity, SPM is also configured:
 
 ```bash
-swift build        # Debug build
+swift build              # Debug build
 swift build -c release   # Optimized release build
-swift test         # Run tests via SPM
 ```
 
-> [!NOTE]
-> SPM builds output to `.build/` while the `build.sh` script outputs to `build/on-fly-translator.app`.
+SPM builds output a bare executable to `.build/`; only `build.sh` produces the `TransPaste.app` bundle needed for permissions to work.
+
+### Continuous Integration
+
+Every push and pull request to `main` runs the [CI workflow](.github/workflows/ci.yml) with three stages:
+
+1. **Build** — compiles the app bundle and verifies the code signature
+2. **Test** — runs the full test suite
+3. **Package** — zips `TransPaste.app` and uploads it as a downloadable artifact (30-day retention)
 
 ### Project Configuration
 
 | File | Purpose |
 |---|---|
-| `Package.swift` | SPM manifest — targets macOS 13+, defines executable and test targets |
-| `Info.plist` | Bundle ID: `com.user.on-fly-translator`, `LSUIElement: true` (no Dock icon) |
+| `Package.swift` | SPM manifest — targets macOS 13+, defines the executable target |
+| `Info.plist` | Bundle ID: `com.mavrovde.translator`, `LSUIElement: true` (no Dock icon) |
 | `.gitignore` | Ignores `build/`, `.build/`, Xcode artifacts, logs, and `.env` |
 
 ### API Key Priority
@@ -213,6 +229,8 @@ The `GoogleGeminiService` resolves the API key in this order:
 
 1. **Environment variable** `GEMINI_API_KEY`
 2. **UserDefaults** key `GeminiAPIKey` (set via the menu bar "Paste API Key" option)
+
+The key is sent as the `x-goog-api-key` request header, keeping it out of URLs (which proxies and servers commonly log).
 
 ### Logging
 
@@ -238,6 +256,7 @@ All events are logged to **`~/translator.log`** with ISO 8601 timestamps:
 | **App not visible** | Look for the speech bubble icon in the menu bar. The app has no Dock icon by design (`LSUIElement: true`). |
 | **Translation pastes into wrong app** | Ensure you don't click other windows between confirming and pasting. The app hides itself to restore focus. |
 | **Permission prompt not appearing** | Run `./automated_setup.sh` to reset and re-configure permissions. |
+| **Permissions lost after updating** | The app was renamed from `on-fly-translator` to `TransPaste` (new bundle ID) — re-grant permissions once via `./automated_setup.sh`. |
 
 ### Viewing Logs
 
@@ -250,7 +269,7 @@ tail -f ~/translator.log
 ## 🛡️ Privacy & Security
 
 - **No data collection** — text is sent directly to the Google Gemini API and not stored anywhere except the local log file.
-- **API key stored locally** — saved in macOS `UserDefaults` (per-user, not shared).
+- **API key stored locally** — saved in macOS `UserDefaults` (per-user, not shared) and transmitted only as a request header, never in URLs.
 - **Ad-hoc code signing** — the build script signs the bundle with an ad-hoc identity for stable permission grants across rebuilds.
 - **No network calls** unless a translation is explicitly triggered by the user.
 

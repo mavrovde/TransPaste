@@ -1,9 +1,5 @@
 import Cocoa
 
-import Cocoa
-
-
-// Need to assure Logger/Service are public
 class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitorDelegate {
     var statusItem: NSStatusItem!
     var sourceLanguageMenu: NSMenu!
@@ -33,7 +29,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
         // 1. Create UI immediately so app is visible
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "bubble.left.and.exclamationmark.bubble.right", accessibilityDescription: "Translator")
+            button.image = NSImage(systemSymbolName: "bubble.left.and.exclamationmark.bubble.right", accessibilityDescription: "TransPaste")
+            button.appearsDisabled = !isTranslationEnabled
         }
         setupMenu()
         
@@ -57,7 +54,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
             DispatchQueue.main.async {
                 let alert = NSAlert()
                 alert.messageText = "Permission Required"
-                alert.informativeText = "on-fly-translator needs Accessibility permissions to Copy & Paste text.\n\n1. Open System Settings > Privacy & Security > Accessibility.\n2. Enable 'on-fly-translator'.\n3. Relaunch the app."
+                alert.informativeText = "TransPaste needs Accessibility permissions to Copy & Paste text.\n\n1. Open System Settings > Privacy & Security > Accessibility.\n2. Enable 'TransPaste'.\n3. Relaunch the app."
                 alert.alertStyle = .critical
                 alert.addButton(withTitle: "Open Settings")
                 alert.addButton(withTitle: "Quit")
@@ -160,7 +157,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
             alert.addButton(withTitle: btn)
         }
         
-        // Ensure on-fly-translator is active to show the alert
+        // Ensure TransPaste is active to show the alert
         NSApp.activate(ignoringOtherApps: true)
         alert.layout()
         alert.window.level = .floating
@@ -235,11 +232,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
             // Actually start the monitor now that we have permissions
             Logger.shared.log("Manual permission check passed. Starting monitor.")
             inputMonitor.delegate = self
-            inputMonitor.start()
+            _ = inputMonitor.start()
             
         } else {
             alert.messageText = "Permissions Denied"
-            alert.informativeText = "Permission is still missing.\n1. Open System Settings > Privacy > Input Monitoring.\n2. Toggle on-fly-translator ON (or remove and re-add)."
+            alert.informativeText = "Permission is still missing.\n1. Open System Settings > Privacy > Input Monitoring.\n2. Toggle TransPaste ON (or remove and re-add)."
             alert.addButton(withTitle: "Open Settings")
         }
         
@@ -261,7 +258,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
         sender.state = isTranslationEnabled ? .on : .off
         
         if let button = statusItem.button {
-             button.image = NSImage(systemSymbolName: isTranslationEnabled ? "character.book.closed.fill" : "character.book.closed", accessibilityDescription: "Translator")
+            button.appearsDisabled = !isTranslationEnabled
         }
     }
     

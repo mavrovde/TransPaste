@@ -12,6 +12,7 @@ public class InputMonitor {
     
     private var hotKeyID: EventHotKeyID?
     private var hotKeyRef: EventHotKeyRef?
+    private var eventHandlerRef: EventHandlerRef?
     
     // Key Codes
     let kVK_ANSI_T = 0x11
@@ -23,8 +24,15 @@ public class InputMonitor {
     public init() {}
 
     public func start() -> Bool {
+        // "Check Permissions" in the menu calls start() again — re-registering the
+        // same hotkey would fire the handler twice per keypress
+        guard hotKeyRef == nil else {
+            Logger.shared.log("Hotkey already registered. Skipping re-registration.")
+            return true
+        }
+
         Logger.shared.log("Registering Carbon Hotkey (Ctrl+Cmd+T)...")
-        
+
         var eventType = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
             eventKind: UInt32(kEventHotKeyPressed)
@@ -45,7 +53,7 @@ public class InputMonitor {
             1,
             &eventType,
             ptr,
-            nil
+            &eventHandlerRef
         )
         
         if status != noErr {
@@ -76,7 +84,16 @@ public class InputMonitor {
         Logger.shared.log("Carbon Hotkey Registered Successfully.")
         return true
     }
-    
+
+    deinit {
+        if let hotKeyRef = hotKeyRef {
+            UnregisterEventHotKey(hotKeyRef)
+        }
+        if let eventHandlerRef = eventHandlerRef {
+            RemoveEventHandler(eventHandlerRef)
+        }
+    }
+
     func handleHotKey() {
         guard isEnabled else { return }
         Logger.shared.log("Carbon Hotkey Detected! Triggering macro...")
@@ -175,8 +192,14 @@ public class InputMonitor {
     
     private func handleCapturedText(_ text: String) {
         Logger.shared.log("Captured Text: \(text.prefix(20))...")
-        
-        delegate?.triggerTranslation(for: text) { translatedText in
+
+        guard let delegate = delegate else {
+            Logger.shared.log("No delegate set. Dropping captured text.")
+            isMacroRunning = false
+            return
+        }
+
+        delegate.triggerTranslation(for: text) { translatedText in
             self.isMacroRunning = false // Reset lock when done (or cancelled)
             guard let translatedText = translatedText else { return }
             
