@@ -16,7 +16,7 @@ gh release download "$TAG" --dir "$DIR"
 
 Checks, all must pass:
 
-1. **Assets**: exactly `TransPaste-$V.dmg`, `TransPaste-$V.zip`, and their `.sha256` files.
+1. **Assets**: exactly `TransPaste-$V.dmg`, `TransPaste-$V.zip`, and their `.sha256` files (releases before v1.3.0 are zip-only).
 2. **Checksums**: `cd "$DIR" && shasum -a 256 -c "TransPaste-$V.zip.sha256" && shasum -a 256 -c "TransPaste-$V.dmg.sha256"`.
 3. **Signature (zip)**: `ditto -x -k "TransPaste-$V.zip" . && codesign --verify --verbose TransPaste.app`.
 3b. **DMG**: `hdiutil attach "TransPaste-$V.dmg" -nobrowse` → volume contains `TransPaste.app` (signed, verify as above) and an `Applications` symlink → `hdiutil detach`.
