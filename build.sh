@@ -13,8 +13,11 @@ mkdir -p "${RESOURCES_DIR}"
 # Compile
 swiftc -O Sources/*.swift -o "${MACOS_DIR}/${APP_NAME}"
 
-# Copy Info.plist
+# Copy Info.plist and sync the version from AppInfo.swift (single source)
 cp Info.plist "${CONTENTS_DIR}/Info.plist"
+VERSION=$(grep -o 'version = "[^"]*"' Sources/AppInfo.swift | cut -d'"' -f2)
+plutil -replace CFBundleShortVersionString -string "${VERSION}" "${CONTENTS_DIR}/Info.plist"
+plutil -replace CFBundleVersion -string "${VERSION}" "${CONTENTS_DIR}/Info.plist"
 
 # Set executable permissions
 chmod +x "${MACOS_DIR}/${APP_NAME}"
