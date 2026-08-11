@@ -4,7 +4,8 @@ name: CodeQL
 # small concurrent-runner pool, so scans are strictly rationed:
 # - only when Swift code or build inputs actually change (paths filter)
 # - superseded runs cancel automatically (concurrency group)
-# - weekly full scan as the safety net
+# - weekly full scan + manual workflow_dispatch as the safety net
+# - workflow edits alone do NOT trigger a scan (use workflow_dispatch to validate)
 on:
   push:
     branches: [main]
@@ -13,7 +14,6 @@ on:
       - 'Tests/**'
       - 'Package.swift'
       - 'build.sh'
-      - '.github/workflows/codeql.yml'
   pull_request:
     branches: [main]
     paths:
@@ -21,9 +21,10 @@ on:
       - 'Tests/**'
       - 'Package.swift'
       - 'build.sh'
-      - '.github/workflows/codeql.yml'
   schedule:
     - cron: '30 5 * * 1'
+  # On-demand scan (e.g. after workflow changes): gh workflow run codeql.yml
+  workflow_dispatch:
 
 permissions:
   contents: read
