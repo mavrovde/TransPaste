@@ -1,28 +1,33 @@
-import XCTest
-@testable import on_fly_translator
+import Foundation
 
-class LoggerTests: XCTestCase {
-    
-    func testSingleton() {
-        let instance1 = Logger.shared
-        let instance2 = Logger.shared
-        XCTAssertTrue(instance1 === instance2)
+func runLoggerTests() {
+    test("Logger is a singleton") {
+        expect(Logger.shared === Logger.shared)
     }
-    
-    func testLogFileCreation() {
-        let logger = Logger.shared
-        let testMessage = "Test Log Entry \(UUID().uuidString)"
-        
-        logger.log(testMessage)
-        
-        // Allow file I/O to complete
-        Thread.sleep(forTimeInterval: 0.1)
-        
-        do {
-            let logContent = try String(contentsOf: logger.logURL, encoding: .utf8)
-            XCTAssertTrue(logContent.contains(testMessage), "Log file should contain the logged message")
-        } catch {
-            XCTFail("Failed to read log file: \(error)")
+
+    test("log appends message to the log file") {
+        let marker = "Test Log Entry \(UUID().uuidString)"
+        Logger.shared.log(marker)
+        Logger.shared.flush()
+
+        let content = (try? String(contentsOf: Logger.shared.logURL, encoding: .utf8)) ?? ""
+        expect(content.contains(marker), "log file should contain the logged message")
+    }
+
+    test("concurrent logging loses no messages") {
+        let marker = UUID().uuidString
+        let iterations = 50
+        DispatchQueue.concurrentPerform(iterations: iterations) { i in
+            Logger.shared.log("Concurrent \(marker) #\(i)")
+        }
+        Logger.shared.flush()
+
+        let content = (try? String(contentsOf: Logger.shared.logURL, encoding: .utf8)) ?? ""
+        for i in 0..<iterations {
+            if !content.contains("Concurrent \(marker) #\(i)") {
+                failTest("missing concurrent log entry #\(i)")
+                break
+            }
         }
     }
 }

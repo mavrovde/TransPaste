@@ -1,55 +1,28 @@
 #!/bin/bash
+# Compiles and runs the full test suite. Works with Command Line Tools only
+# (no Xcode/XCTest required — see Tests/TestKit.swift).
+#
+# Usage:
+#   ./test.sh              # run all tests
+#   ./test.sh "API key"    # run only tests whose name matches the filter
+set -euo pipefail
 cd "$(dirname "$0")"
 
-echo "Building Tests..."
+BUILD_DIR="build/tests"
+TEST_BIN="${BUILD_DIR}/transpaste-tests"
 
-# We need to compile the Sources (excluding main.swift) and the Tests.
-# We create a temporary test main.
+mkdir -p "${BUILD_DIR}"
 
-cat > Tests/LinuxMain.swift <<EOF
-import XCTest
-@testable import on_fly_translator_tests
-
-// Manual registering might be needed depending on Swift version, 
-// but let's try just running the bundle or creating a executable that imports XCTest.
-
-// Actually, on macOS, the easiest way without SPM is to compile everything into an executable 
-// and call XCTMain([testCase(GoogleGeminiServiceTests.allTests)]).
-// But for that we need to add 'allTests' to the class.
-EOF
-
-# Simply compiling the test file + sources into a binary often works if we add a call to XCTMain
-# checking GoogleGeminiServiceTests.swift again...
-
-cat > Tests/RunTests.swift <<EOF
-import XCTest
-
-@main
-struct TestRunner {
-    static func main() {
-        // Create the suite
-        let suite = XCTestSuite(name: "All Tests")
-        suite.addTest(GoogleGeminiServiceTests(selector: #selector(GoogleGeminiServiceTests.testRequestCreation)))
-        suite.addTest(GoogleGeminiServiceTests(selector: #selector(GoogleGeminiServiceTests.testMissingAPIKeyError)))
-        
-        // Run
-        suite.run()
-    }
-}
-EOF
-
-# Compile
+echo "Building tests..."
+# Sources/main.swift is excluded: its top-level code would conflict with the
+# test runner's @main entry point.
 swiftc \
+    Sources/AppDelegate.swift \
     Sources/GoogleGeminiService.swift \
+    Sources/InputMonitor.swift \
     Sources/Logger.swift \
-    Tests/GoogleGeminiServiceTests.swift \
-    Tests/RunTests.swift \
-    -o Tests/on-fly-translator-tests
+    Tests/*.swift \
+    -o "${TEST_BIN}"
 
-if [ $? -eq 0 ]; then
-    echo "Running Tests..."
-    ./Tests/on-fly-translator-tests
-else
-    echo "Compilation Failed"
-    exit 1
-fi
+echo "Running tests..."
+"${TEST_BIN}" "$@"

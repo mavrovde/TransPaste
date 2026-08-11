@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Build app bundle
+        run: ./build.sh
+
+      - name: Verify code signature
+        run: codesign --verify --verbose build/TransPaste.app
+
+  test:
+    name: Test
+    runs-on: macos-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Run test suite
+        run: ./test.sh
+
+  package:
+    name: Package
+    runs-on: macos-latest
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Build app bundle
+        run: ./build.sh
+
+      - name: Zip app bundle
+        run: ditto -c -k --keepParent build/TransPaste.app build/TransPaste.app.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: TransPaste.app
+          path: build/TransPaste.app.zip
+          retention-days: 30
+          if-no-files-found: error

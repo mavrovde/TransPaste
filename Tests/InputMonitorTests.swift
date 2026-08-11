@@ -1,63 +1,39 @@
-import XCTest
-@testable import on_fly_translator
-import CoreGraphics
+import Cocoa
 
-class InputMonitorTests: XCTestCase {
-    
-    var monitor: InputMonitor!
-    var mockDelegate: MockInputMonitorDelegate!
-    
-    override func setUp() {
-        super.setUp()
-        monitor = InputMonitor()
-        mockDelegate = MockInputMonitorDelegate()
-        monitor.delegate = mockDelegate
-    }
-    
-    func testInitialization() {
-        XCTAssertTrue(monitor.isEnabled)
-        XCTAssertNotNil(monitor.delegate)
-    }
-    
-    // Test that handleHotKey calls the delegate via the macro
-    func testHandleHotKey() {
-        let expectation = self.expectation(description: "Macro triggered translation")
-        
-        // We need to subclass or mock InputMonitor to avoid actual CGEvent posting which might fail or do nothing in tests.
-        // Or we just verify the delegate is called.
-        // But performTranslationMacro has async delays.
-        
-        // Hack: We can't easily test the macro's CGEvent emission without side effects.
-        // But we can check if it tries to get pasteboard.
-        // Let's at least call handleHotKey and wait to see if it crashes.
-        
-        monitor.handleHotKey()
-        
-        // Since the macro relies on COPYING text, we should populate pasteboard.
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString("Test Text", forType: .string)
-        
-        // The macro waits 0.1s + 0.1s.
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            // We assume the macro ran. 
-            // The assert here is weak because we can't intercept the "Copy" command easily.
-            // But if the delegate is called, we know it worked.
-            // However, the macro WON'T call the delegate if the simulated Cmd+C didn't update the clipboard (which it won't in a unit test likely).
-            expectation.fulfill()
-        }
-        
-        waitForExpectations(timeout: 1.0, handler: nil)
-    }
-}
-
-class MockInputMonitorDelegate: InputMonitorDelegate {
+final class MockInputMonitorDelegate: InputMonitorDelegate {
     var triggerCount = 0
     var lastCapturedText: String?
-    
+
     func triggerTranslation(for text: String, completion: @escaping (String?) -> Void) {
         triggerCount += 1
         lastCapturedText = text
         completion("Translated: \(text)")
+    }
+}
+
+// The hotkey registration and capture macro need real Accessibility/Input
+// Monitoring permissions and a focused target app, so only the pure logic is
+// tested here. The full flow is verified manually via the built .app.
+func runInputMonitorTests() {
+    test("monitor starts enabled with its delegate set") {
+        let monitor = InputMonitor()
+        let delegate = MockInputMonitorDelegate()
+        monitor.delegate = delegate
+        expect(monitor.isEnabled, "monitor should default to enabled")
+        expectNotNil(monitor.delegate)
+    }
+
+    test("disabled monitor ignores hotkey") {
+        let monitor = InputMonitor()
+        let delegate = MockInputMonitorDelegate()
+        monitor.delegate = delegate
+        monitor.isEnabled = false
+
+        monitor.handleHotKey()
+
+        // The enabled path dispatches async to main; spin briefly to prove
+        // nothing was scheduled.
+        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        expectEqual(delegate.triggerCount, 0, "delegate must not fire while disabled")
     }
 }
