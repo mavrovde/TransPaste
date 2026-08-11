@@ -29,6 +29,7 @@ A lightweight macOS **menu bar app** that translates text on the fly using **you
 translator/
 ├── Sources/
 │   ├── main.swift                  # App entry point — creates NSApplication
+│   ├── AppInfo.swift               # App metadata — single source of the version
 │   ├── AppDelegate.swift           # Menu bar UI, language selection, permission prompts
 │   ├── InputMonitor.swift          # Carbon hotkey registration, text capture macro
 │   ├── TranslationService.swift    # Multi-provider REST client (Gemini, OpenAI, Claude, Ollama, custom)
@@ -37,6 +38,7 @@ translator/
 │   ├── TestKit.swift               # Minimal XCTest-free test harness
 │   ├── TestMain.swift              # Test runner entry point
 │   ├── TranslationServiceTests.swift
+│   ├── AppInfoTests.swift
 │   ├── InputMonitorTests.swift
 │   └── LoggerTests.swift
 ├── .github/workflows/              # CI (build → test → package), CodeQL, release publishing
@@ -123,7 +125,7 @@ After launching the app, open **Provider** in the menu bar dropdown and pick you
 This will:
 1. Compile all Swift source files with optimizations (`-O`)
 2. Create the app bundle at `build/TransPaste.app`
-3. Copy `Info.plist` into the bundle
+3. Copy `Info.plist` into the bundle and sync its version from `Sources/AppInfo.swift`
 4. Ad-hoc code-sign the bundle for stable identity
 
 ### 4. Grant Permissions
@@ -180,7 +182,7 @@ Look for the 💬 speech bubble icon in your menu bar.
 |---|---|
 | **Source: \<language\>** | Choose the input language (or Auto-detect). Default: Russian |
 | **Target: \<language\>** | Choose the output language. Default: German |
-| **Provider: \<name\>** | Everything provider-related in one submenu: pick a provider (a `— needs API key` suffix marks unready ones; the top-level title shows ⚠ too), then contextual actions for the selected provider — **Paste API Key from Clipboard**, **Get \<Provider\> API Key…**, **Configure Endpoint & Model…** (Custom only), and **Edit providers.json…**. Picking a provider without a key offers to paste one or open its key page right away. Default: Gemini |
+| **Provider: \<name\>** | Everything provider-related in one submenu: pick a provider (a `— needs API key` suffix marks unready ones; the top-level title shows ⚠ too), then contextual actions for the selected provider — **Paste API Key from Clipboard**, **Get \<Provider\> API Key…**, **Configure Endpoint & Model…** (Custom only), and **Edit providers.json…** (key-less providers get *Open <Provider> Website…* and an *(optional)* key paste instead). Picking a provider without a key offers to paste one or open its key page right away. Default: Gemini |
 | **Enable Translation** | Toggle the hotkey on/off (`Ctrl+Cmd+T`) — the menu bar icon dims while disabled |
 | **Check Permissions** | Re-checks Accessibility permissions and starts the input monitor |
 | **About TransPaste** | Version, author, active provider/model, and config/log paths |
@@ -199,9 +201,10 @@ Look for the 💬 speech bubble icon in your menu bar.
 
 Tests use a **self-contained harness** (`Tests/TestKit.swift`) instead of XCTest, so they run on machines with only Command Line Tools installed. Coverage includes:
 
-- **`TranslationServiceTests`** — per-provider request construction (headers, endpoints, body shapes), per-provider response parsing (including Claude thinking blocks and refusals), API errors, malformed JSON, missing keys, and end-to-end `translate()` for all three providers via a mocked `URLSession`
+- **`TranslationServiceTests`** — per-provider request construction (headers, endpoints, body shapes), per-provider response parsing (including Claude thinking blocks and refusals), API errors, malformed JSON, missing keys, and end-to-end `translate()` for Gemini, OpenAI, Claude, and Ollama (plus the custom provider) via a mocked `URLSession`
 - **`InputMonitorTests`** — initial state, disabled-hotkey guard
 - **`LoggerTests`** — singleton identity, file writes, concurrent logging
+- **`AppInfoTests`** — semantic version format, metadata coherence, Info.plist ↔ AppInfo version sync
 
 > [!NOTE]
 > The hotkey registration and capture macro require real Accessibility/Input Monitoring permissions and a focused target app, so the end-to-end flow is verified manually via the built app.
@@ -233,7 +236,7 @@ Pushing a `v*` tag additionally runs the [Release workflow](.github/workflows/re
 |---|---|
 | `Package.swift` | SPM manifest — swift-tools 6.0 (language mode pinned to v5), targets macOS 13+ |
 | `Sources/AppInfo.swift` | Single source of the app version — `build.sh` injects it into the bundle's Info.plist |
-| `Info.plist` | Bundle ID: `com.mavrovde.translator`, `LSUIElement: true` (no Dock icon) |
+| `Info.plist` | Bundle ID: `com.mavrovde.transpaste`, `LSUIElement: true` (no Dock icon) |
 | `.gitignore` | Ignores `build/`, `.build/`, Xcode artifacts, logs, and `.env` |
 | `package_dmg.sh` | Builds the drag-to-Applications `TransPaste-<version>.dmg` (used by CI and releases) |
 
@@ -241,8 +244,8 @@ Pushing a `v*` tag additionally runs the [Release workflow](.github/workflows/re
 
 Each provider resolves its API key in this order:
 
-1. **Environment variable** — `GEMINI_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`
-2. **UserDefaults** — `GeminiAPIKey`, `OpenAIAPIKey`, or `AnthropicAPIKey` (set via the menu bar "Paste API Key" option)
+1. **Environment variable** — `GEMINI_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY` (plus optional `OLLAMA_API_KEY` / `CUSTOM_LLM_API_KEY` for authed local/custom servers)
+2. **UserDefaults** — `GeminiAPIKey`, `OpenAIAPIKey`, `AnthropicAPIKey`, `OllamaAPIKey`, or `CustomAPIKey` (set via the menu bar "Paste API Key" option)
 
 | Provider | Model |
 |---|---|
@@ -254,7 +257,7 @@ Each provider resolves its API key in this order:
 
 All defaults above live in **`~/.transpaste/providers.json`** — a commented JSON file auto-created on first run. Edit it (endpoint URLs, model names) whenever a provider changes their API; `{model}` in an endpoint is substituted with the configured model. No rebuild needed.
 
-The key is sent as the `x-goog-api-key` request header, keeping it out of URLs (which proxies and servers commonly log).
+Keys are sent only as request headers (`x-goog-api-key` for Gemini, `Authorization: Bearer` for OpenAI/Ollama/custom, `x-api-key` + `anthropic-version` for Claude), never in URLs (which proxies and servers commonly log).
 
 ### Logging
 

@@ -442,7 +442,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
     @objc func configureCustomProvider(_ sender: NSMenuItem) {
         let alert = NSAlert()
         alert.messageText = "Custom Provider"
-        alert.informativeText = "Any OpenAI-compatible Chat Completions endpoint works: Ollama, LM Studio, vLLM, OpenRouter, LiteLLM...\nSet a token via \"Paste Custom API Key\" if the endpoint needs one; local servers usually don't."
+        alert.informativeText = "Any OpenAI-compatible Chat Completions endpoint works: Ollama, LM Studio, vLLM, OpenRouter, LiteLLM...\nSet a token via \"Paste API Key from Clipboard (optional)\" if the endpoint needs one; local servers usually don't."
 
         let endpointField = NSTextField(frame: NSRect(x: 0, y: 58, width: 360, height: 24))
         endpointField.placeholderString = "Endpoint URL"

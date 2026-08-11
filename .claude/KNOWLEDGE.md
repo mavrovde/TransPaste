@@ -57,7 +57,7 @@ debugging build, permission, or CI problems.
 - Release publishing is `.github/workflows/release.yml` on `v*` tags: guard
   (tag == AppInfo.version) → test → signed build → zip + DMG (`package_dmg.sh`:
   app + /Applications symlink, UDZO) + sha256s → release with generated notes.
-  v1.1.0/v1.2.0 published this way and verified end-to-end.
+  v1.1.0/v1.2.0 published via this pipeline (zip-only, pre-DMG); the DMG ships starting v1.3.0 — all verified end-to-end.
 
 ## Provider integration notes (TranslationService)
 
@@ -108,7 +108,7 @@ debugging build, permission, or CI problems.
 6. Push, open PR, wait for CI green (Build → Test → Package) + CodeQL.
 7. Merge; post-merge CI on `main` must also go green.
 8. Release = tag push (`git tag v<X.Y.Z> && git push origin v<X.Y.Z>`) —
-   `.github/workflows/release.yml` tests, builds, packages (zip + sha256), and
+   `.github/workflows/release.yml` tests, builds, packages (zip + DMG + sha256s), and
    publishes the GitHub release with generated notes (categories from
    `.github/release.yml`, install footer from `.github/RELEASE_FOOTER.md`).
    The workflow fails if the tag doesn't match `AppInfo.version`. If the
