@@ -19,7 +19,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Show Swift version
         run: swift --version
@@ -36,7 +36,7 @@ jobs:
     needs: build
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Run test suite
         run: ./test.sh
@@ -47,7 +47,7 @@ jobs:
     needs: test
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Build app bundle
         run: ./build.sh
@@ -56,7 +56,7 @@ jobs:
         run: ditto -c -k --keepParent build/TransPaste.app build/TransPaste.app.zip
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: TransPaste.app
           path: build/TransPaste.app.zip
