@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/mavrovde/TransPaste/actions/workflows/ci.yml/badge.svg)](https://github.com/mavrovde/TransPaste/actions/workflows/ci.yml)
 
-A lightweight macOS **menu bar app** that translates text on the fly using **your choice of AI provider — Google Gemini, OpenAI, Anthropic Claude, local Ollama, or any OpenAI-compatible endpoint**. Press a global hotkey, confirm the captured text, and the translated result is pasted right back into your active application — no window switching required.
+A lightweight macOS **menu bar app** for **instant in-place translation** with **your choice of AI provider — Google Gemini, OpenAI, Anthropic Claude, local Ollama, or any OpenAI-compatible endpoint**. Select text anywhere, press the global hotkey, confirm — and the translation lands right back where you're working. No window switching, no copy-paste juggling.
 
 ---
 
