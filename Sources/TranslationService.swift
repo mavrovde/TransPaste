@@ -208,6 +208,11 @@ public enum TranslationProvider: String, CaseIterable {
         }
     }
 
+    /// Ready to translate: either has a key or doesn't need one.
+    public var isReady: Bool {
+        !requiresAPIKey || apiKey != nil
+    }
+
     /// Resolution order: environment variable first, then UserDefaults
     /// (set via the menu bar "Paste API Key" option).
     public var apiKey: String? {
