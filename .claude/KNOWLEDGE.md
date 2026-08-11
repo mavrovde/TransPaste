@@ -65,6 +65,16 @@ debugging build, permission, or CI problems.
   regenerates when missing). No binary image assets in the repo — edit the
   Swift file to change the design, delete `build/AppIcon.icns` to force
   regeneration. Preview renders can be visually checked by Reading a PNG.
+- **PR labels must exist before `gh pr create --label` uses them** — it
+  hard-fails on a missing label ("could not add label: 'X' not found") and the
+  PR is not created at all. `.github/release.yml` referenced feature/fix/ci/
+  tooling long before they existed in the repo (only GitHub defaults did);
+  created 2026-08-11 (feature, fix, ci, tooling, skip-changelog). If a new
+  label category is added to release.yml, `gh label create` it too.
+- **`gh pr checks --watch` races fresh PRs** — run seconds after `gh pr create`
+  it exits 1 with "no checks reported" because the workflow hasn't registered
+  its first check yet. Orchestration scripts must poll `gh pr checks <n>`
+  until it succeeds (10s interval works) before starting `--watch`.
 - Release publishing is `.github/workflows/release.yml` on `v*` tags: guard
   (tag == AppInfo.version) → test → signed build → zip + DMG (`package_dmg.sh`:
   app + /Applications symlink, UDZO) + sha256s → release with generated notes.
