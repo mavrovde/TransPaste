@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/mavrovde/TransPaste/actions/workflows/ci.yml/badge.svg)](https://github.com/mavrovde/TransPaste/actions/workflows/ci.yml)
 
-A lightweight macOS **menu bar app** that translates text on the fly using the **Google Gemini API**. Press a global hotkey, confirm the captured text, and the translated result is pasted right back into your active application — no window switching required.
+A lightweight macOS **menu bar app** that translates text on the fly using **your choice of AI provider — Google Gemini, OpenAI, or Anthropic Claude**. Press a global hotkey, confirm the captured text, and the translated result is pasted right back into your active application — no window switching required.
 
 ---
 
@@ -11,7 +11,8 @@ A lightweight macOS **menu bar app** that translates text on the fly using the *
 | Feature | Description |
 |---|---|
 | **Global Hotkey** | `Ctrl + Cmd + T` triggers translation from any application |
-| **AI-Powered Translation** | Uses Google Gemini Flash for fast, accurate translations |
+| **Multi-Provider AI** | Google Gemini, OpenAI, Anthropic Claude, local Ollama, or any custom OpenAI-compatible endpoint (LM Studio, vLLM, OpenRouter...) — switch from the menu, no restart |
+| **No Hardcoded Endpoints** | Provider endpoints and models live in `~/.transpaste/providers.json` (commented, auto-created) — adjust when providers change, no rebuild |
 | **Smart Text Capture** | Attempts the Accessibility API first, falls back to a clipboard-based Select All → Copy macro |
 | **Confirmation Dialogs** | Shows captured text for review before translating, and the result before pasting |
 | **Multi-Language Support** | English, Spanish, French, German, Chinese, Japanese, Russian + Auto-detect |
@@ -30,12 +31,12 @@ translator/
 │   ├── main.swift                  # App entry point — creates NSApplication
 │   ├── AppDelegate.swift           # Menu bar UI, language selection, permission prompts
 │   ├── InputMonitor.swift          # Carbon hotkey registration, text capture macro
-│   ├── GoogleGeminiService.swift   # Gemini REST API client
+│   ├── TranslationService.swift    # Multi-provider REST client (Gemini, OpenAI, Claude)
 │   └── Logger.swift                # Thread-safe singleton file logger
 ├── Tests/
 │   ├── TestKit.swift               # Minimal XCTest-free test harness
 │   ├── TestMain.swift              # Test runner entry point
-│   ├── GoogleGeminiServiceTests.swift
+│   ├── TranslationServiceTests.swift
 │   ├── InputMonitorTests.swift
 │   └── LoggerTests.swift
 ├── .github/workflows/ci.yml        # CI: build → test → package
@@ -55,7 +56,7 @@ graph LR
     B -->|Accessibility API| C{Text captured?}
     B -->|Clipboard fallback| C
     C -->|Yes| D[AppDelegate shows confirmation]
-    D -->|Confirmed| E[GoogleGeminiService]
+    D -->|Confirmed| E[TranslationService]
     E -->|Translation| F[AppDelegate shows result]
     F -->|Paste| G[Cmd+V into active app]
     C -->|No| H[Log error]
@@ -65,7 +66,7 @@ graph LR
 |---|---|
 | **`AppDelegate`** | Menu bar setup, language settings UI, permission checks, translation dialog flow |
 | **`InputMonitor`** | Registers `Ctrl+Cmd+T` via the Carbon `EventHotKey` API, captures text via the Accessibility API or clipboard macro, coordinates paste-back |
-| **`GoogleGeminiService`** | Builds and sends requests to the Gemini `generateContent` endpoint (API key sent via the `x-goog-api-key` header, never in the URL), parses JSON responses |
+| **`TranslationService`** | Builds and sends requests to the selected provider — Gemini `generateContent`, OpenAI Chat Completions, or the Anthropic Messages API (API keys always sent via headers, never in URLs) — and parses each provider's response format |
 | **`Logger`** | Thread-safe singleton that appends timestamped messages to `~/translator.log` from any queue |
 
 ---
@@ -74,7 +75,7 @@ graph LR
 
 - **macOS 13 (Ventura)** or later
 - **Swift 5.9+** — the Xcode **Command Line Tools are sufficient** (`xcode-select --install`); full Xcode is not required
-- **Google Gemini API Key** — [get one here](https://aistudio.google.com/app/apikey)
+- **An API key** for at least one provider: [Google Gemini](https://aistudio.google.com/app/apikey), [OpenAI](https://platform.openai.com/api-keys), or [Anthropic Claude](https://console.anthropic.com/settings/keys)
 - **Accessibility + Input Monitoring permissions** (the app prompts you on first launch)
 
 ---
@@ -96,13 +97,15 @@ Choose **one** of the following methods:
 
 ```bash
 cp .env.example .env
-# Edit .env and replace YOUR_API_KEY_HERE with your actual key
-export GEMINI_API_KEY=your_actual_key
+# Set the key for the provider you use (any one is enough):
+export GEMINI_API_KEY=your_key      # Google Gemini (default provider)
+export OPENAI_API_KEY=your_key      # OpenAI
+export ANTHROPIC_API_KEY=your_key   # Anthropic Claude
 ```
 
 #### Option B — Paste via the App Menu
 
-After launching the app, copy your API key to the clipboard and click **"Paste API Key from Clipboard"** in the menu bar dropdown.
+After launching the app, pick your provider under **Provider** in the menu bar dropdown, copy your API key to the clipboard, and click **"Paste <Provider> API Key"**. Each provider's key is stored separately.
 
 ### 3. Build the Application
 
@@ -170,10 +173,13 @@ Look for the 💬 speech bubble icon in your menu bar.
 |---|---|
 | **Source: \<language\>** | Choose the input language (or Auto-detect). Default: Russian |
 | **Target: \<language\>** | Choose the output language. Default: German |
+| **Provider: \<name\>** | Choose the AI provider (Gemini, OpenAI, Claude, Ollama, or Custom). Default: Gemini |
+| **Configure Custom Provider…** | Set the endpoint URL and model name for any OpenAI-compatible server (defaults to local Ollama at `http://localhost:11434/v1/chat/completions`) |
 | **Enable Translation** | Toggle the hotkey on/off (`Ctrl+Cmd+T`) — the menu bar icon dims while disabled |
-| **Paste API Key from Clipboard** | Save the Gemini API key from your clipboard |
-| **Get API Key…** | Opens the Google AI Studio API key page |
+| **Paste \<Provider\> API Key** | Save the current provider's API key from your clipboard |
+| **Get API Key…** | Opens the current provider's API key page |
 | **Check Permissions** | Re-checks Accessibility permissions and starts the input monitor |
+| **About TransPaste** | Version, author, active provider/model, and config/log paths |
 | **Quit** | Exits the application (`Cmd+Q`) |
 
 ---
@@ -189,7 +195,7 @@ Look for the 💬 speech bubble icon in your menu bar.
 
 Tests use a **self-contained harness** (`Tests/TestKit.swift`) instead of XCTest, so they run on machines with only Command Line Tools installed. Coverage includes:
 
-- **`GoogleGeminiServiceTests`** — request construction (API key in header, prompt building for explicit and auto-detect modes) and every `translate()` result path (success, API error, missing candidates, safety-blocked candidates, malformed JSON, missing API key) via a mocked `URLSession`
+- **`TranslationServiceTests`** — per-provider request construction (headers, endpoints, body shapes), per-provider response parsing (including Claude thinking blocks and refusals), API errors, malformed JSON, missing keys, and end-to-end `translate()` for all three providers via a mocked `URLSession`
 - **`InputMonitorTests`** — initial state, disabled-hotkey guard
 - **`LoggerTests`** — singleton identity, file writes, concurrent logging
 
@@ -219,16 +225,27 @@ Every push and pull request to `main` runs the [CI workflow](.github/workflows/c
 
 | File | Purpose |
 |---|---|
-| `Package.swift` | SPM manifest — targets macOS 13+, defines the executable target |
+| `Package.swift` | SPM manifest — swift-tools 6.0 (language mode pinned to v5), targets macOS 13+ |
+| `Sources/AppInfo.swift` | Single source of the app version — `build.sh` injects it into the bundle's Info.plist |
 | `Info.plist` | Bundle ID: `com.mavrovde.translator`, `LSUIElement: true` (no Dock icon) |
 | `.gitignore` | Ignores `build/`, `.build/`, Xcode artifacts, logs, and `.env` |
 
 ### API Key Priority
 
-The `GoogleGeminiService` resolves the API key in this order:
+Each provider resolves its API key in this order:
 
-1. **Environment variable** `GEMINI_API_KEY`
-2. **UserDefaults** key `GeminiAPIKey` (set via the menu bar "Paste API Key" option)
+1. **Environment variable** — `GEMINI_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`
+2. **UserDefaults** — `GeminiAPIKey`, `OpenAIAPIKey`, or `AnthropicAPIKey` (set via the menu bar "Paste API Key" option)
+
+| Provider | Model |
+|---|---|
+| Google Gemini (default) | `gemini-flash-latest` |
+| OpenAI | `gpt-5-mini` |
+| Anthropic Claude | `claude-opus-5` (`effort: low` for fast responses) |
+| Ollama (local) | `llama3.2` at `http://localhost:11434` — no API key needed |
+| Custom | Any OpenAI-compatible endpoint — endpoint URL and model are configurable from the menu; token is optional (local servers usually need none) |
+
+All defaults above live in **`~/.transpaste/providers.json`** — a commented JSON file auto-created on first run. Edit it (endpoint URLs, model names) whenever a provider changes their API; `{model}` in an endpoint is substituted with the configured model. No rebuild needed.
 
 The key is sent as the `x-goog-api-key` request header, keeping it out of URLs (which proxies and servers commonly log).
 
@@ -252,7 +269,7 @@ All events are logged to **`~/translator.log`** with ISO 8601 timestamps:
 |---|---|
 | **Hotkey not responding** | Check that Input Monitoring is enabled in System Settings. Try "Check Permissions" from the menu. |
 | **"Clipboard empty" in logs** | Grant Accessibility permission — the app needs it to simulate `Cmd+C`. |
-| **"API Error" or "No API Key"** | Verify your Gemini API key is set (env var or menu). Check network connectivity. |
+| **"API Error" or "No API Key"** | Verify the selected provider's API key is set (env var or menu). Check network connectivity. |
 | **App not visible** | Look for the speech bubble icon in the menu bar. The app has no Dock icon by design (`LSUIElement: true`). |
 | **Translation pastes into wrong app** | Ensure you don't click other windows between confirming and pasting. The app hides itself to restore focus. |
 | **Permission prompt not appearing** | Run `./automated_setup.sh` to reset and re-configure permissions. |
@@ -268,8 +285,8 @@ tail -f ~/translator.log
 
 ## 🛡️ Privacy & Security
 
-- **No data collection** — text is sent directly to the Google Gemini API and not stored anywhere except the local log file.
-- **API key stored locally** — saved in macOS `UserDefaults` (per-user, not shared) and transmitted only as a request header, never in URLs.
+- **No data collection** — text is sent directly to the selected AI provider's API and not stored anywhere except the local log file.
+- **API keys stored locally** — saved per-provider in macOS `UserDefaults` (per-user, not shared) and transmitted only as request headers, never in URLs.
 - **Ad-hoc code signing** — the build script signs the bundle with an ad-hoc identity for stable permission grants across rebuilds.
 - **No network calls** unless a translation is explicitly triggered by the user.
 

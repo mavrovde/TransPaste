@@ -4,6 +4,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
     var statusItem: NSStatusItem!
     var sourceLanguageMenu: NSMenu!
     var targetLanguageMenu: NSMenu!
+    var providerMenu: NSMenu!
+    var providerMenuItem: NSMenuItem!
+    var apiKeyMenuItem: NSMenuItem!
     
     var currentSourceLanguage: String {
         get { UserDefaults.standard.string(forKey: "SourceLanguageV3") ?? "Russian" }
@@ -23,7 +26,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
     let languages = ["Auto", "English", "Spanish", "French", "German", "Chinese", "Japanese", "Russian"]
     
     let inputMonitor = InputMonitor()
-    let geminiService = GoogleGeminiService()
+    let translationService = TranslationService()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // 1. Create UI immediately so app is visible
@@ -103,8 +106,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
                 return
             }
             
-            // 2. Call Gemini
-            self.geminiService.translate(text: text, from: self.currentSourceLanguage, to: self.currentTargetLanguage) { result in
+            // 2. Call the selected provider
+            self.translationService.translate(text: text, from: self.currentSourceLanguage, to: self.currentTargetLanguage) { result in
                 DispatchQueue.main.async {
                     switch result {
                     case .success(let translation):
@@ -192,7 +195,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
         }
         menu.setSubmenu(targetLanguageMenu, for: targetItem)
         menu.addItem(targetItem)
-        
+
+        // Provider Submenu
+        let currentProvider = TranslationService.currentProvider
+        providerMenuItem = NSMenuItem(title: "Provider: \(currentProvider.displayName)", action: nil, keyEquivalent: "")
+        providerMenu = NSMenu()
+        for provider in TranslationProvider.allCases {
+            let item = NSMenuItem(title: provider.displayName, action: #selector(selectProvider(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = provider.rawValue
+            if provider == currentProvider { item.state = .on }
+            providerMenu.addItem(item)
+        }
+        menu.setSubmenu(providerMenu, for: providerMenuItem)
+        menu.addItem(providerMenuItem)
+
         menu.addItem(NSMenuItem.separator())
 
         // Toggle Translation
@@ -203,9 +220,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
         
         menu.addItem(NSMenuItem.separator())
         
-        // API Key Setup
-        menu.addItem(NSMenuItem(title: "Paste API Key from Clipboard", action: #selector(pasteAPIKey(_:)), keyEquivalent: ""))
+        // API Key Setup — targets the currently selected provider
+        apiKeyMenuItem = NSMenuItem(title: "Paste \(currentProvider.displayName) API Key", action: #selector(pasteAPIKey(_:)), keyEquivalent: "")
+        menu.addItem(apiKeyMenuItem)
         menu.addItem(NSMenuItem(title: "Get API Key...", action: #selector(openAPIKeyURL(_:)), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Configure Custom Provider...", action: #selector(configureCustomProvider(_:)), keyEquivalent: ""))
         
         menu.addItem(NSMenuItem.separator())
         
@@ -213,8 +232,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
         menu.addItem(NSMenuItem(title: "Check Permissions", action: #selector(checkPermissions(_:)), keyEquivalent: ""))
         
         menu.addItem(NSMenuItem.separator())
-        
-        // Quit Item
+
+        // About + Quit
+        let aboutItem = NSMenuItem(title: "About \(AppInfo.name)", action: #selector(showAbout(_:)), keyEquivalent: "")
+        aboutItem.target = self
+        menu.addItem(aboutItem)
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         
         statusItem.menu = menu
@@ -262,13 +284,24 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
         }
     }
     
+    @objc func selectProvider(_ sender: NSMenuItem) {
+        guard let rawValue = sender.representedObject as? String,
+              let provider = TranslationProvider(rawValue: rawValue) else { return }
+        TranslationService.currentProvider = provider
+        updateMenuState(menu: providerMenu, selectedTitle: provider.displayName)
+        providerMenuItem.title = "Provider: \(provider.displayName)"
+        apiKeyMenuItem.title = "Paste \(provider.displayName) API Key"
+        Logger.shared.log("Provider switched to \(provider.displayName)")
+    }
+
     @objc func pasteAPIKey(_ sender: NSMenuItem) {
+        let provider = TranslationService.currentProvider
         if let key = NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty {
-            UserDefaults.standard.set(key, forKey: "GeminiAPIKey")
-            
+            UserDefaults.standard.set(key, forKey: provider.defaultsKey)
+
             // Show confirmation
             let alert = NSAlert()
-            alert.messageText = "API Key Saved"
+            alert.messageText = "\(provider.displayName) API Key Saved"
             alert.informativeText = "Key: \(key.prefix(5))...\(key.suffix(3))"
             alert.alertStyle = .informational
             // Ensure visibility
@@ -289,8 +322,75 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
     }
     
     @objc func openAPIKeyURL(_ sender: NSMenuItem) {
-        if let url = URL(string: "https://aistudio.google.com/app/apikey") {
+        if let url = URL(string: TranslationService.currentProvider.apiKeyURL) {
             NSWorkspace.shared.open(url)
+        }
+    }
+
+    @objc func showAbout(_ sender: NSMenuItem) {
+        let provider = TranslationService.currentProvider
+        let alert = NSAlert()
+        alert.messageText = "\(AppInfo.name) \(AppInfo.version)"
+        alert.informativeText = """
+        On-the-fly translation for macOS — press Ctrl+Cmd+T in any app.
+
+        Provider: \(provider.displayName) (\(provider.model))
+        Config: ~/.transpaste/providers.json
+        Log: ~/translator.log
+
+        © \(Calendar.current.component(.year, from: Date())) \(AppInfo.author)
+        """
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "GitHub")
+
+        NSApp.activate(ignoringOtherApps: true)
+        alert.layout()
+        alert.window.level = .floating
+
+        if alert.runModal() == .alertSecondButtonReturn,
+           let url = URL(string: AppInfo.repoURL) {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    @objc func configureCustomProvider(_ sender: NSMenuItem) {
+        let alert = NSAlert()
+        alert.messageText = "Custom Provider"
+        alert.informativeText = "Any OpenAI-compatible Chat Completions endpoint works: Ollama, LM Studio, vLLM, OpenRouter, LiteLLM...\nSet a token via \"Paste Custom API Key\" if the endpoint needs one; local servers usually don't."
+
+        let endpointField = NSTextField(frame: NSRect(x: 0, y: 58, width: 360, height: 24))
+        endpointField.placeholderString = "Endpoint URL"
+        endpointField.stringValue = TranslationProvider.customEndpoint
+
+        let modelField = NSTextField(frame: NSRect(x: 0, y: 26, width: 360, height: 24))
+        modelField.placeholderString = "Model name (e.g. llama3.2)"
+        modelField.stringValue = TranslationProvider.customModel
+
+        let hint = NSTextField(labelWithString: "Endpoint URL (top) and model name (bottom)")
+        hint.frame = NSRect(x: 0, y: 0, width: 360, height: 18)
+        hint.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+        hint.textColor = .secondaryLabelColor
+
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 360, height: 86))
+        container.addSubview(endpointField)
+        container.addSubview(modelField)
+        container.addSubview(hint)
+        alert.accessoryView = container
+
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+
+        NSApp.activate(ignoringOtherApps: true)
+        alert.layout()
+        alert.window.level = .floating
+        alert.window.initialFirstResponder = endpointField
+
+        if alert.runModal() == .alertFirstButtonReturn {
+            let endpoint = endpointField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            let model = modelField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !endpoint.isEmpty { TranslationProvider.customEndpoint = endpoint }
+            if !model.isEmpty { TranslationProvider.customModel = model }
+            Logger.shared.log("Custom provider configured: \(model) @ \(endpoint)")
         }
     }
     

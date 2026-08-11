@@ -16,13 +16,8 @@ mkdir -p "${BUILD_DIR}"
 echo "Building tests..."
 # Sources/main.swift is excluded: its top-level code would conflict with the
 # test runner's @main entry point.
-swiftc \
-    Sources/AppDelegate.swift \
-    Sources/GoogleGeminiService.swift \
-    Sources/InputMonitor.swift \
-    Sources/Logger.swift \
-    Tests/*.swift \
-    -o "${TEST_BIN}"
+SOURCES=$(ls Sources/*.swift | grep -v 'Sources/main.swift')
+swiftc ${SOURCES} Tests/*.swift -o "${TEST_BIN}"
 
 echo "Running tests..."
 "${TEST_BIN}" "$@"
