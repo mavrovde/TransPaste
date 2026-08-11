@@ -38,7 +38,7 @@ debugging build, permission, or CI problems.
 ## CI / GitHub facts
 
 - CI (`.github/workflows/ci.yml`): Build (bundle + `codesign --verify`) →
-  Test (`./test.sh`) → Package (zipped `TransPaste.app` artifact). All stages
+  Test (`./test.sh`) → Package (zipped `TransPaste.app` + DMG installer artifacts). All stages
   run on `macos-latest`; whole pipeline ~1.5 min.
 - **CodeQL default setup hangs forever on this repo** — its Swift autobuilder
   guesses xcodebuild/SPM and never finishes against our swiftc build. We use
@@ -55,8 +55,9 @@ debugging build, permission, or CI problems.
   weekly full scan. If Build sits "queued" for many minutes, suspect runner
   starvation — `gh run list` and cancel redundant scans first.
 - Release publishing is `.github/workflows/release.yml` on `v*` tags: guard
-  (tag == AppInfo.version) → test → signed build → zip + sha256 → release with
-  generated notes. v1.1.0 published this way and verified end-to-end.
+  (tag == AppInfo.version) → test → signed build → zip + DMG (`package_dmg.sh`:
+  app + /Applications symlink, UDZO) + sha256s → release with generated notes.
+  v1.1.0/v1.2.0 published this way and verified end-to-end.
 
 ## Provider integration notes (TranslationService)
 

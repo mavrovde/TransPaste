@@ -33,11 +33,14 @@ jobs:
       - name: Verify code signature
         run: codesign --verify --verbose build/TransPaste.app
 
-      - name: Package with checksum
+      - name: Package with checksums (zip + dmg)
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           ditto -c -k --keepParent build/TransPaste.app "build/TransPaste-${VERSION}.zip"
-          cd build && shasum -a 256 "TransPaste-${VERSION}.zip" > "TransPaste-${VERSION}.zip.sha256"
+          ./package_dmg.sh
+          cd build
+          shasum -a 256 "TransPaste-${VERSION}.zip" > "TransPaste-${VERSION}.zip.sha256"
+          shasum -a 256 "TransPaste-${VERSION}.dmg" > "TransPaste-${VERSION}.dmg.sha256"
 
       - name: Publish GitHub release
         env:
@@ -49,6 +52,8 @@ jobs:
           printf '\n\n' >> notes.md
           cat .github/RELEASE_FOOTER.md >> notes.md
           gh release create "$GITHUB_REF_NAME" \
+            "build/TransPaste-${VERSION}.dmg" \
+            "build/TransPaste-${VERSION}.dmg.sha256" \
             "build/TransPaste-${VERSION}.zip" \
             "build/TransPaste-${VERSION}.zip.sha256" \
             --title "TransPaste ${VERSION}" \
