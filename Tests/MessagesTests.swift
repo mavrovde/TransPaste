@@ -11,11 +11,8 @@ func runMessagesTests() {
             "permissionRequiredText": UserMessages.permissionRequiredText,
             "openSettingsButton": UserMessages.openSettingsButton,
             "laterButton": UserMessages.laterButton,
-            "permissionGrantedTitle": UserMessages.permissionGrantedTitle,
-            "permissionGrantedText": UserMessages.permissionGrantedText,
-            "permissionDeniedTitle": UserMessages.permissionDeniedTitle,
-            "permissionDeniedText": UserMessages.permissionDeniedText,
             "readyTitle": UserMessages.readyTitle,
+            "setupAllSetTitle": UserMessages.setupAllSetTitle,
             "readyText": UserMessages.readyText,
             "clipboardEmptyTitle": UserMessages.clipboardEmptyTitle,
             "clipboardEmptyText": UserMessages.clipboardEmptyText,
@@ -49,8 +46,22 @@ func runMessagesTests() {
                "must reflect the automatic grant detection")
         expect(!UserMessages.permissionRequiredText.contains("Relaunch the app"),
                "stale relaunch instruction must be gone")
-        expect(UserMessages.permissionDeniedText.contains("System Settings"))
         expect(UserMessages.readyText.contains("Ctrl+Cmd+T"), "ready message teaches the hotkey")
+    }
+
+    test("setup assistant messages chain the steps and teach the hotkey") {
+        let allSet = UserMessages.setupAllSetText(providerName: "Google Gemini")
+        expect(allSet.contains("Google Gemini"))
+        expect(allSet.contains("Accessibility"))
+        expect(allSet.contains("Ctrl+Cmd+T"), "final step must teach the hotkey")
+
+        let oneStep = UserMessages.setupOneStepLeft(providerName: "OpenAI")
+        expect(oneStep.contains("OpenAI"))
+        expect(oneStep.contains("API key"), "must say what the remaining step is")
+        expect(oneStep.contains("Ollama"), "must offer the key-less escape hatch")
+
+        expect(UserMessages.apiKeySavedText(maskedKey: "sk-ab...xyz").contains("Ctrl+Cmd+T"),
+               "saving the key completes setup — teach the hotkey right there")
     }
 
     test("parameterized messages interpolate their arguments") {

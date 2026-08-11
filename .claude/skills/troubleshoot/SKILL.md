@@ -12,7 +12,7 @@ Start with the log — every subsystem writes there:
 
 | Log/symptom | Cause | Fix |
 |---|---|---|
-| No "Carbon Hotkey Detected" on keypress | Input Monitoring not granted, or hotkey registration failed at launch | "Check Permissions" in the menu; else `./automated_setup.sh` |
+| No "Carbon Hotkey Detected" on keypress | Input Monitoring not granted, or hotkey registration failed at launch | "Setup Assistant…" in the menu; else `./automated_setup.sh` |
 | "AX Failed ... -25211" | Accessibility permission missing/stale (kAXErrorAPIDisabled) | Re-grant Accessibility; stale grants after rebuild → `./automated_setup.sh` (TCC is signing-identity-bound) |
 | "Clipboard empty or invalid after retries" | Cmd+C simulation blocked (Accessibility) or the target app has no selection and blocks Cmd+A | Re-grant Accessibility; test in TextEdit to isolate the app |
 | "API Error: ..." | Provider rejected the request — bad key, quota, wrong model | Check the selected provider's key (menu or env var); check the model in `~/.transpaste/providers.json` still exists |

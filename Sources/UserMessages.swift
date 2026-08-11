@@ -20,17 +20,23 @@ public enum UserMessages {
     public static let openSettingsButton = "Open Settings"
     public static let laterButton = "Later"
 
-    public static let permissionGrantedTitle = "Permissions Granted"
-    public static let permissionGrantedText = "Access confirmed! The input monitor is running."
-    public static let permissionDeniedTitle = "Permissions Denied"
-    public static let permissionDeniedText = """
-        Permission is still missing.
-        1. Open System Settings > Privacy & Security > Accessibility.
-        2. Toggle TransPaste ON (or remove and re-add it).
-        """
-
     public static let readyTitle = "TransPaste is ready"
     public static let readyText = "Accessibility granted — select text anywhere and press Ctrl+Cmd+T."
+
+    // MARK: Setup assistant
+
+    public static let setupAllSetTitle = "All set"
+    public static func setupAllSetText(providerName: String) -> String {
+        """
+        Accessibility permission ✓
+        Provider: \(providerName) ✓
+
+        Select text anywhere and press Ctrl+Cmd+T.
+        """
+    }
+    public static func setupOneStepLeft(providerName: String) -> String {
+        "Accessibility is on — one step left: \(providerName) needs an API key. Or pick a key-less provider (Ollama) from the Provider menu."
+    }
 
     // MARK: API keys
 
@@ -38,7 +44,7 @@ public enum UserMessages {
         "\(providerName) API Key Saved"
     }
     public static func apiKeySavedText(maskedKey: String) -> String {
-        "Key: \(maskedKey)"
+        "Key: \(maskedKey)\n\nSelect text anywhere and press Ctrl+Cmd+T."
     }
     public static let clipboardEmptyTitle = "Clipboard Empty or Invalid"
     public static let clipboardEmptyText = "Copy your API key to the clipboard first, then use this menu item again."
