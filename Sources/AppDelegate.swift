@@ -6,6 +6,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
     var targetLanguageMenu: NSMenu!
     var providerMenu: NSMenu!
     var providerMenuItem: NSMenuItem!
+    var setupMenuItem: NSMenuItem!
+    var setupSeparator: NSMenuItem!
+
+    /// Setup is done when the app can both capture text (Accessibility)
+    /// and translate it (selected provider has what it needs).
+    var isSetupComplete: Bool {
+        AXIsProcessTrusted() && TranslationService.currentProvider.isReady
+    }
+
+    func refreshSetupItem() {
+        setupMenuItem.isHidden = isSetupComplete
+        setupSeparator.isHidden = isSetupComplete
+    }
     
     var currentSourceLanguage: String {
         get { UserDefaults.standard.string(forKey: "SourceLanguageV3") ?? "Russian" }
@@ -53,26 +66,27 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
         if !accessEnabled {
             Logger.shared.log("Accessibility not enabled. Prompting user and watching for the grant...")
             watchForAccessibilityGrant()
-
-            DispatchQueue.main.async {
-                let alert = NSAlert()
-                alert.messageText = UserMessages.permissionRequiredTitle
-                alert.informativeText = UserMessages.permissionRequiredText
-                alert.alertStyle = .critical
-                alert.addButton(withTitle: UserMessages.openSettingsButton)
-                alert.addButton(withTitle: UserMessages.laterButton)
-
-                NSApp.activate(ignoringOtherApps: true)
-                alert.layout()
-                alert.window.level = .floating
-
-                if alert.runModal() == .alertFirstButtonReturn,
-                   let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-                    NSWorkspace.shared.open(url)
-                }
-            }
+            DispatchQueue.main.async { self.showPermissionAlert() }
         } else {
             Logger.shared.log("Accessibility permissions confirmed.")
+        }
+    }
+
+    func showPermissionAlert() {
+        let alert = NSAlert()
+        alert.messageText = UserMessages.permissionRequiredTitle
+        alert.informativeText = UserMessages.permissionRequiredText
+        alert.alertStyle = .critical
+        alert.addButton(withTitle: UserMessages.openSettingsButton)
+        alert.addButton(withTitle: UserMessages.laterButton)
+
+        NSApp.activate(ignoringOtherApps: true)
+        alert.layout()
+        alert.window.level = .floating
+
+        if alert.runModal() == .alertFirstButtonReturn,
+           let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
         }
     }
 
@@ -84,20 +98,52 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
     func watchForAccessibilityGrant() {
         guard accessibilityWatchTimer == nil else { return }
         accessibilityWatchTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] timer in
-            guard AXIsProcessTrusted() else { return }
+            guard let self, AXIsProcessTrusted() else { return }
             timer.invalidate()
-            self?.accessibilityWatchTimer = nil
-            Logger.shared.log("Accessibility granted — ready without relaunch.")
+            self.accessibilityWatchTimer = nil
+            Logger.shared.log("Accessibility granted — continuing setup without relaunch.")
             NSSound(named: "Glass")?.play()
-            let alert = NSAlert()
-            alert.messageText = UserMessages.readyTitle
-            alert.informativeText = UserMessages.readyText
-            alert.addButton(withTitle: UserMessages.okButton)
-            NSApp.activate(ignoringOtherApps: true)
-            alert.layout()
-            alert.window.level = .floating
-            alert.runModal()
+            _ = self.inputMonitor.start()
+
+            // Chain straight into the next missing piece instead of
+            // declaring victory while the provider still can't translate.
+            let provider = TranslationService.currentProvider
+            if provider.isReady {
+                _ = self.showDialog(title: UserMessages.readyTitle,
+                                    message: UserMessages.readyText,
+                                    buttons: [UserMessages.okButton])
+            } else {
+                self.promptForMissingKey(provider,
+                                         leadIn: UserMessages.setupOneStepLeft(providerName: provider.displayName))
+            }
         }
+    }
+
+    /// One entry point for the whole setup: checks each requirement in
+    /// order, guides through the first missing one, and reports "all set"
+    /// when there's nothing left to do.
+    @objc func runSetupAssistant(_ sender: Any?) {
+        // Re-registering the hotkey is idempotent and repairs a failed launch registration
+        inputMonitor.delegate = self
+        _ = inputMonitor.start()
+
+        if !AXIsProcessTrusted() {
+            Logger.shared.log("Setup assistant: Accessibility missing.")
+            watchForAccessibilityGrant()  // the chain continues automatically on grant
+            showPermissionAlert()
+            return
+        }
+
+        let provider = TranslationService.currentProvider
+        if !provider.isReady {
+            Logger.shared.log("Setup assistant: provider \(provider.displayName) not ready.")
+            promptForMissingKey(provider)
+            return
+        }
+
+        _ = showDialog(title: UserMessages.setupAllSetTitle,
+                       message: UserMessages.setupAllSetText(providerName: provider.displayName),
+                       buttons: [UserMessages.okButton])
     }
     
     // InputMonitorDelegate
@@ -202,7 +248,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
     func setupMenu() {
         let menu = NSMenu()
         Logger.shared.log("Setting up menu...")
-        
+
+        // Visible only while something is missing — one click to the
+        // guided flow, gone once the app is fully working.
+        setupMenuItem = NSMenuItem(title: "⚠ Finish Setup…", action: #selector(runSetupAssistant(_:)), keyEquivalent: "")
+        setupMenuItem.target = self
+        menu.addItem(setupMenuItem)
+        setupSeparator = NSMenuItem.separator()
+        menu.addItem(setupSeparator)
+        refreshSetupItem()
+
         // Source Language Submenu
         let sourceItem = NSMenuItem(title: "Source: \(currentSourceLanguage)", action: nil, keyEquivalent: "")
         sourceLanguageMenu = NSMenu()
@@ -248,9 +303,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
 
         menu.addItem(NSMenuItem.separator())
         
-        // Debug
-        menu.addItem(NSMenuItem(title: "Check Permissions", action: #selector(checkPermissions(_:)), keyEquivalent: ""))
-        
+        // Always available: re-checks permission + provider and guides
+        // through whatever is missing (also re-registers the hotkey)
+        let assistantItem = NSMenuItem(title: "Setup Assistant…", action: #selector(runSetupAssistant(_:)), keyEquivalent: "")
+        assistantItem.target = self
+        menu.addItem(assistantItem)
+
         menu.addItem(NSMenuItem.separator())
 
         // About + Quit
@@ -260,38 +318,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         
         statusItem.menu = menu
-    }
-    
-    @objc func checkPermissions(_ sender: NSMenuItem) {
-        let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String : true]
-        let accessEnabled = AXIsProcessTrustedWithOptions(options)
-        
-        let alert = NSAlert()
-        if accessEnabled {
-            alert.messageText = UserMessages.permissionGrantedTitle
-            alert.informativeText = UserMessages.permissionGrantedText
-            
-            // Actually start the monitor now that we have permissions
-            Logger.shared.log("Manual permission check passed. Starting monitor.")
-            inputMonitor.delegate = self
-            _ = inputMonitor.start()
-            
-        } else {
-            alert.messageText = UserMessages.permissionDeniedTitle
-            alert.informativeText = UserMessages.permissionDeniedText
-            alert.addButton(withTitle: UserMessages.openSettingsButton)
-        }
-        
-        NSApp.activate(ignoringOtherApps: true)
-        alert.layout()
-        alert.window.level = .floating
-        let result = alert.runModal()
-        
-        if !accessEnabled && result == .alertFirstButtonReturn {
-             if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
-                NSWorkspace.shared.open(url)
-            }
-        }
     }
     
     @objc func toggleTranslation(_ sender: NSMenuItem) {
@@ -354,10 +380,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
         providerMenuItem.title = current.isReady
             ? "Provider: \(current.displayName)"
             : "Provider: \(current.displayName) ⚠"
+
+        // Readiness feeds the Finish Setup item too — one refresh path
+        // covers key saves, provider switches, and menu opens alike.
+        refreshSetupItem()
     }
 
-    // Keep readiness marks fresh every time the root menu or the provider
-    // submenu opens (keys can change via env vars or the config file)
+    // Keep readiness marks and the Finish Setup item fresh every time the
+    // root menu or the provider submenu opens (keys can change via env
+    // vars or the config file; the grant can land at any moment)
     func menuNeedsUpdate(_ menu: NSMenu) {
         if menu === providerMenu || menu === statusItem.menu {
             rebuildProviderMenu()
@@ -378,10 +409,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
         }
     }
 
-    func promptForMissingKey(_ provider: TranslationProvider) {
+    func promptForMissingKey(_ provider: TranslationProvider, leadIn: String? = nil) {
         let alert = NSAlert()
         alert.messageText = UserMessages.missingKeyTitle(provider.displayName)
-        alert.informativeText = UserMessages.missingKeyText
+        alert.informativeText = leadIn.map { "\($0)\n\n\(UserMessages.missingKeyText)" }
+            ?? UserMessages.missingKeyText
         alert.addButton(withTitle: UserMessages.pasteFromClipboardButton)
         alert.addButton(withTitle: UserMessages.openKeyPageButton)
         alert.addButton(withTitle: UserMessages.laterButton)

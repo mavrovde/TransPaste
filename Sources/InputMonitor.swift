@@ -24,7 +24,7 @@ public class InputMonitor {
     public init() {}
 
     public func start() -> Bool {
-        // "Check Permissions" in the menu calls start() again — re-registering the
+        // "Setup Assistant…" in the menu calls start() again — re-registering the
         // same hotkey would fire the handler twice per keypress
         guard hotKeyRef == nil else {
             Logger.shared.log("Hotkey already registered. Skipping re-registration.")

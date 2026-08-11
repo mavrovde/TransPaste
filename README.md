@@ -186,7 +186,8 @@ Look for the 💬 speech bubble icon in your menu bar.
 | **Target: \<language\>** | Choose the output language. Default: German |
 | **Provider: \<name\>** | Everything provider-related in one submenu: pick a provider (a `— needs API key` suffix marks unready ones; the top-level title shows ⚠ too), then contextual actions for the selected provider — **Paste API Key from Clipboard**, **Get \<Provider\> API Key…**, **Configure Endpoint & Model…** (Custom only), and **Edit providers.json…** (key-less providers get *Open <Provider> Website…* and an *(optional)* key paste instead). Picking a provider without a key offers to paste one or open its key page right away. Default: Gemini |
 | **Enable Translation** | Toggle the hotkey on/off (`Ctrl+Cmd+T`) — the menu bar icon dims while disabled |
-| **Check Permissions** | Re-checks Accessibility permissions and starts the input monitor |
+| **⚠ Finish Setup…** | Appears only while something is missing (permission or provider key) — one click into the guided setup |
+| **Setup Assistant…** | Guided check of everything the app needs: re-registers the hotkey, walks through the Accessibility grant (auto-detected, no relaunch) and the provider key, then confirms "All set" |
 | **About TransPaste** | Version, author, active provider/model, and config/log paths |
 | **Quit** | Exits the application (`Cmd+Q`) |
 
@@ -279,7 +280,7 @@ All events are logged to **`~/translator.log`** with ISO 8601 timestamps:
 
 | Problem | Solution |
 |---|---|
-| **Hotkey not responding** | Check that Input Monitoring is enabled in System Settings. Try "Check Permissions" from the menu. |
+| **Hotkey not responding** | Check that Input Monitoring is enabled in System Settings. Try "Setup Assistant…" from the menu. |
 | **"Clipboard empty" in logs** | Grant Accessibility permission — the app needs it to simulate `Cmd+C`. |
 | **"API Error" or "No API Key"** | Verify the selected provider's API key is set (env var or menu). Check network connectivity. |
 | **App not visible** | Look for the speech bubble icon in the menu bar. The app has no Dock icon by design (`LSUIElement: true`). |
