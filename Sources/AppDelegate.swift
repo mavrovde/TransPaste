@@ -51,32 +51,52 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
         let accessEnabled = AXIsProcessTrustedWithOptions(options)
         
         if !accessEnabled {
-            Logger.shared.log("Accessibility not enabled. Prompting user...")
-            
+            Logger.shared.log("Accessibility not enabled. Prompting user and watching for the grant...")
+            watchForAccessibilityGrant()
+
             DispatchQueue.main.async {
                 let alert = NSAlert()
-                alert.messageText = "Permission Required"
-                alert.informativeText = "TransPaste needs Accessibility permissions to Copy & Paste text.\n\n1. Open System Settings > Privacy & Security > Accessibility.\n2. Enable 'TransPaste'.\n3. Relaunch the app."
+                alert.messageText = UserMessages.permissionRequiredTitle
+                alert.informativeText = UserMessages.permissionRequiredText
                 alert.alertStyle = .critical
-                alert.addButton(withTitle: "Open Settings")
-                alert.addButton(withTitle: "Quit")
-                
+                alert.addButton(withTitle: UserMessages.openSettingsButton)
+                alert.addButton(withTitle: UserMessages.laterButton)
+
                 NSApp.activate(ignoringOtherApps: true)
                 alert.layout()
                 alert.window.level = .floating
-                
-                let response = alert.runModal()
-                
-                if response == .alertFirstButtonReturn {
-                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-                        NSWorkspace.shared.open(url)
-                    }
-                } else {
-                    NSApp.terminate(nil)
+
+                if alert.runModal() == .alertFirstButtonReturn,
+                   let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                    NSWorkspace.shared.open(url)
                 }
             }
         } else {
             Logger.shared.log("Accessibility permissions confirmed.")
+        }
+    }
+
+    // The one thing macOS won't let us automate is the grant click itself —
+    // but we can detect it the moment it happens, so no relaunch and no
+    // guessing whether setup worked.
+    private var accessibilityWatchTimer: Timer?
+
+    func watchForAccessibilityGrant() {
+        guard accessibilityWatchTimer == nil else { return }
+        accessibilityWatchTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] timer in
+            guard AXIsProcessTrusted() else { return }
+            timer.invalidate()
+            self?.accessibilityWatchTimer = nil
+            Logger.shared.log("Accessibility granted — ready without relaunch.")
+            NSSound(named: "Glass")?.play()
+            let alert = NSAlert()
+            alert.messageText = UserMessages.readyTitle
+            alert.informativeText = UserMessages.readyText
+            alert.addButton(withTitle: UserMessages.okButton)
+            NSApp.activate(ignoringOtherApps: true)
+            alert.layout()
+            alert.window.level = .floating
+            alert.runModal()
         }
     }
     
@@ -93,9 +113,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
         // 1. Show Input Dialog
         DispatchQueue.main.async {
             let response = self.showDialog(
-                title: "Translate this text?",
+                title: UserMessages.translatePromptTitle,
                 message: text,
-                buttons: ["Translate", "Cancel"]
+                buttons: [UserMessages.translateButton, UserMessages.cancelButton]
             )
             
             if response != .alertFirstButtonReturn {
@@ -114,9 +134,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
                         
                         // 3. Show Output Dialog
                         let outResponse = self.showDialog(
-                            title: "Translation Result",
+                            title: UserMessages.resultTitle,
                             message: translation,
-                            buttons: ["Paste", "Cancel"]
+                            buttons: [UserMessages.pasteButton, UserMessages.cancelButton]
                         )
                         
                         if outResponse == .alertFirstButtonReturn {
@@ -138,7 +158,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
                     case .failure(let error):
                         Logger.shared.log("Translation failed: \(error)")
                         NSSound(named: "Basso")?.play()
-                        _ = self.showDialog(title: "Error", message: error.localizedDescription, buttons: ["OK"])
+                        let provider = TranslationService.currentProvider
+
+                        if case .noAPIKey = error {
+                            // Guided setup beats an error box
+                            self.promptForMissingKey(provider)
+                        } else {
+                            var message = error.localizedDescription
+                            if case .networkError = error, !provider.requiresAPIKey {
+                                message += UserMessages.localServerHint(endpoint: provider.endpoint)
+                            }
+                            _ = self.showDialog(title: UserMessages.translationFailedTitle(provider.displayName),
+                                                message: message, buttons: [UserMessages.okButton])
+                        }
                         NSApp.hide(nil)
                         completion(nil)
                     }
@@ -236,8 +268,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
         
         let alert = NSAlert()
         if accessEnabled {
-            alert.messageText = "Permissions Granted"
-            alert.informativeText = "Access confirmed! Starting Input Monitor..."
+            alert.messageText = UserMessages.permissionGrantedTitle
+            alert.informativeText = UserMessages.permissionGrantedText
             
             // Actually start the monitor now that we have permissions
             Logger.shared.log("Manual permission check passed. Starting monitor.")
@@ -245,9 +277,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
             _ = inputMonitor.start()
             
         } else {
-            alert.messageText = "Permissions Denied"
-            alert.informativeText = "Permission is still missing.\n1. Open System Settings > Privacy > Input Monitoring.\n2. Toggle TransPaste ON (or remove and re-add)."
-            alert.addButton(withTitle: "Open Settings")
+            alert.messageText = UserMessages.permissionDeniedTitle
+            alert.informativeText = UserMessages.permissionDeniedText
+            alert.addButton(withTitle: UserMessages.openSettingsButton)
         }
         
         NSApp.activate(ignoringOtherApps: true)
@@ -348,11 +380,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
 
     func promptForMissingKey(_ provider: TranslationProvider) {
         let alert = NSAlert()
-        alert.messageText = "\(provider.displayName) needs an API key"
-        alert.informativeText = "Copy your key, then click \"Paste from Clipboard\" — or open the key page first."
-        alert.addButton(withTitle: "Paste from Clipboard")
-        alert.addButton(withTitle: "Open Key Page")
-        alert.addButton(withTitle: "Later")
+        alert.messageText = UserMessages.missingKeyTitle(provider.displayName)
+        alert.informativeText = UserMessages.missingKeyText
+        alert.addButton(withTitle: UserMessages.pasteFromClipboardButton)
+        alert.addButton(withTitle: UserMessages.openKeyPageButton)
+        alert.addButton(withTitle: UserMessages.laterButton)
 
         NSApp.activate(ignoringOtherApps: true)
         alert.layout()
@@ -387,8 +419,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
 
             // Show confirmation
             let alert = NSAlert()
-            alert.messageText = "\(provider.displayName) API Key Saved"
-            alert.informativeText = "Key: \(key.prefix(5))...\(key.suffix(3))"
+            alert.messageText = UserMessages.apiKeySavedTitle(provider.displayName)
+            alert.informativeText = UserMessages.apiKeySavedText(maskedKey: "\(key.prefix(5))...\(key.suffix(3))")
             alert.alertStyle = .informational
             // Ensure visibility
             NSApp.activate(ignoringOtherApps: true)
@@ -397,8 +429,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
             alert.runModal()
         } else {
             let alert = NSAlert()
-            alert.messageText = "Clipboard Empty or Invalid"
-            alert.informativeText = "Please copy your API Key first."
+            alert.messageText = UserMessages.clipboardEmptyTitle
+            alert.informativeText = UserMessages.clipboardEmptyText
             alert.alertStyle = .warning
             NSApp.activate(ignoringOtherApps: true)
             alert.layout()
@@ -416,18 +448,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
     @objc func showAbout(_ sender: NSMenuItem) {
         let provider = TranslationService.currentProvider
         let alert = NSAlert()
-        alert.messageText = "\(AppInfo.name) \(AppInfo.version)"
-        alert.informativeText = """
-        Instant in-place translation for macOS: select text anywhere, press Ctrl+Cmd+T, and the translation lands right back where you're working.
-
-        Provider: \(provider.displayName) (\(provider.model))
-        Config: ~/.transpaste/providers.json
-        Log: ~/translator.log
-
-        © \(Calendar.current.component(.year, from: Date())) \(AppInfo.author)
-        """
-        alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "GitHub")
+        alert.messageText = UserMessages.aboutTitle()
+        alert.informativeText = UserMessages.aboutText(
+            providerName: provider.displayName,
+            model: provider.model,
+            year: Calendar.current.component(.year, from: Date()))
+        alert.addButton(withTitle: UserMessages.okButton)
+        alert.addButton(withTitle: UserMessages.githubButton)
 
         NSApp.activate(ignoringOtherApps: true)
         alert.layout()
@@ -441,8 +468,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
 
     @objc func configureCustomProvider(_ sender: NSMenuItem) {
         let alert = NSAlert()
-        alert.messageText = "Custom Provider"
-        alert.informativeText = "Any OpenAI-compatible Chat Completions endpoint works: Ollama, LM Studio, vLLM, OpenRouter, LiteLLM...\nSet a token via \"Paste API Key from Clipboard (optional)\" if the endpoint needs one; local servers usually don't."
+        alert.messageText = UserMessages.customProviderTitle
+        alert.informativeText = UserMessages.customProviderText
 
         let endpointField = NSTextField(frame: NSRect(x: 0, y: 58, width: 360, height: 24))
         endpointField.placeholderString = "Endpoint URL"
@@ -452,7 +479,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
         modelField.placeholderString = "Model name (e.g. llama3.2)"
         modelField.stringValue = TranslationProvider.customModel
 
-        let hint = NSTextField(labelWithString: "Endpoint URL (top) and model name (bottom)")
+        let hint = NSTextField(labelWithString: UserMessages.customProviderHint)
         hint.frame = NSRect(x: 0, y: 0, width: 360, height: 18)
         hint.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
         hint.textColor = .secondaryLabelColor
@@ -463,8 +490,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
         container.addSubview(hint)
         alert.accessoryView = container
 
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: UserMessages.saveButton)
+        alert.addButton(withTitle: UserMessages.cancelButton)
 
         NSApp.activate(ignoringOtherApps: true)
         alert.layout()

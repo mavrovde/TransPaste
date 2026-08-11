@@ -19,6 +19,25 @@ public enum TranslationError: Error, Equatable {
     }
 }
 
+// Human-readable messages — without this, dialogs show the useless
+// "(TransPaste.TranslationError error N.)"
+extension TranslationError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .noAPIKey:
+            return "No API key is configured for the selected provider."
+        case .invalidURL:
+            return "The provider's endpoint URL is invalid. Check ~/.transpaste/providers.json (or \"Configure Endpoint & Model\" for the Custom provider)."
+        case .networkError(let error):
+            return "Couldn't reach the provider: \(error.localizedDescription)"
+        case .decodingError:
+            return "The provider sent an unexpected response. Check that the endpoint is OpenAI-compatible and the model name in ~/.transpaste/providers.json exists."
+        case .apiError(let message):
+            return message
+        }
+    }
+}
+
 /// User-editable provider configuration. Endpoints and models are never
 /// hardcoded in request-building code — they resolve from
 /// `~/.transpaste/providers.json` (auto-created from the commented template
