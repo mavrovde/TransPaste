@@ -15,6 +15,12 @@ debugging build, permission, or CI problems.
   completions may hop to the main queue and a semaphore wait deadlocks.
 
 ### macOS TCC permissions are bound to code-signing identity
+- **Every new install/copy needs a fresh Accessibility grant** — a DMG install
+  to /Applications is a different binary+path than the dev build; the hotkey
+  still fires (Carbon needs no permission) but capture fails with AX -25211
+  and the app looks dead. Stale grants accumulate (tccutil reset cleared 3
+  entries after one day of rebuilds); reset + re-grant the installed copy.
+  automated_setup.sh prefers /Applications when present.
 - The ad-hoc `codesign` step in `build.sh` is load-bearing: it stabilizes the
   bundle identity so Accessibility/Input Monitoring grants survive rebuilds.
 - Changing `CFBundleIdentifier` (currently `com.mavrovde.transpaste`)

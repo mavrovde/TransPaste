@@ -1,7 +1,13 @@
 #!/bin/bash
 
-APP_PATH="$(pwd)/build/TransPaste.app"
+# Prefer the installed copy (DMG install); fall back to the dev build
+if [ -d "/Applications/TransPaste.app" ]; then
+    APP_PATH="/Applications/TransPaste.app"
+else
+    APP_PATH="$(pwd)/build/TransPaste.app"
+fi
 BUNDLE_ID="com.mavrovde.transpaste"
+echo "Target app: ${APP_PATH}"
 
 echo "=== Automating Permission Setup ==="
 
