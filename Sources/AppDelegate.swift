@@ -6,7 +6,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
     var targetLanguageMenu: NSMenu!
     var providerMenu: NSMenu!
     var providerMenuItem: NSMenuItem!
-    var apiKeyMenuItem: NSMenuItem!
     
     var currentSourceLanguage: String {
         get { UserDefaults.standard.string(forKey: "SourceLanguageV3") ?? "Russian" }
@@ -196,19 +195,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
         menu.setSubmenu(targetLanguageMenu, for: targetItem)
         menu.addItem(targetItem)
 
-        // Provider Submenu
-        let currentProvider = TranslationService.currentProvider
-        providerMenuItem = NSMenuItem(title: "Provider: \(currentProvider.displayName)", action: nil, keyEquivalent: "")
+        // Provider Submenu — everything provider-related lives here:
+        // picker with readiness state, key actions for the selected provider,
+        // custom endpoint config, and the providers.json escape hatch.
+        providerMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         providerMenu = NSMenu()
-        for provider in TranslationProvider.allCases {
-            let item = NSMenuItem(title: provider.displayName, action: #selector(selectProvider(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = provider.rawValue
-            if provider == currentProvider { item.state = .on }
-            providerMenu.addItem(item)
-        }
+        providerMenu.delegate = self  // refresh readiness on every open
         menu.setSubmenu(providerMenu, for: providerMenuItem)
         menu.addItem(providerMenuItem)
+        rebuildProviderMenu()
+        menu.delegate = self  // refresh the ⚠ readiness title before display
 
         menu.addItem(NSMenuItem.separator())
 
@@ -217,15 +213,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
         toggleItem.keyEquivalentModifierMask = [.command, .control]
         toggleItem.state = isTranslationEnabled ? .on : .off
         menu.addItem(toggleItem)
-        
-        menu.addItem(NSMenuItem.separator())
-        
-        // API Key Setup — targets the currently selected provider
-        apiKeyMenuItem = NSMenuItem(title: "Paste \(currentProvider.displayName) API Key", action: #selector(pasteAPIKey(_:)), keyEquivalent: "")
-        menu.addItem(apiKeyMenuItem)
-        menu.addItem(NSMenuItem(title: "Get API Key...", action: #selector(openAPIKeyURL(_:)), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Configure Custom Provider...", action: #selector(configureCustomProvider(_:)), keyEquivalent: ""))
-        
+
         menu.addItem(NSMenuItem.separator())
         
         // Debug
@@ -284,18 +272,116 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
         }
     }
     
+    /// Rebuilds the provider submenu: providers with inline readiness,
+    /// then contextual actions for the currently selected provider only.
+    func rebuildProviderMenu() {
+        let current = TranslationService.currentProvider
+        providerMenu.removeAllItems()
+
+        for provider in TranslationProvider.allCases {
+            let title = provider.isReady
+                ? provider.displayName
+                : "\(provider.displayName) — needs API key"
+            let item = NSMenuItem(title: title, action: #selector(selectProvider(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = provider.rawValue
+            if provider == current { item.state = .on }
+            providerMenu.addItem(item)
+        }
+
+        providerMenu.addItem(NSMenuItem.separator())
+
+        // Contextual actions for the selected provider. Every provider can
+        // take a key (key-less ones send it as an optional Bearer token, e.g.
+        // remote/authed Ollama), so the paste item is always offered.
+        let pasteTitle = current.requiresAPIKey
+            ? "Paste API Key from Clipboard"
+            : "Paste API Key from Clipboard (optional)"
+        let paste = NSMenuItem(title: pasteTitle, action: #selector(pasteAPIKey(_:)), keyEquivalent: "")
+        paste.target = self
+        providerMenu.addItem(paste)
+
+        if !current.apiKeyURL.isEmpty {
+            // Ollama's URL is its download page, not an API key page
+            let getTitle = current.requiresAPIKey
+                ? "Get \(current.displayName) API Key..."
+                : "Open \(current.displayName) Website..."
+            let get = NSMenuItem(title: getTitle, action: #selector(openAPIKeyURL(_:)), keyEquivalent: "")
+            get.target = self
+            providerMenu.addItem(get)
+        }
+        if current == .custom {
+            let configure = NSMenuItem(title: "Configure Endpoint & Model...", action: #selector(configureCustomProvider(_:)), keyEquivalent: "")
+            configure.target = self
+            providerMenu.addItem(configure)
+        }
+        let edit = NSMenuItem(title: "Edit providers.json...", action: #selector(editProvidersConfig(_:)), keyEquivalent: "")
+        edit.target = self
+        providerMenu.addItem(edit)
+
+        providerMenuItem.title = current.isReady
+            ? "Provider: \(current.displayName)"
+            : "Provider: \(current.displayName) ⚠"
+    }
+
+    // Keep readiness marks fresh every time the root menu or the provider
+    // submenu opens (keys can change via env vars or the config file)
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        if menu === providerMenu || menu === statusItem.menu {
+            rebuildProviderMenu()
+        }
+    }
+
     @objc func selectProvider(_ sender: NSMenuItem) {
         guard let rawValue = sender.representedObject as? String,
               let provider = TranslationProvider(rawValue: rawValue) else { return }
         TranslationService.currentProvider = provider
-        updateMenuState(menu: providerMenu, selectedTitle: provider.displayName)
-        providerMenuItem.title = "Provider: \(provider.displayName)"
-        apiKeyMenuItem.title = "Paste \(provider.displayName) API Key"
+        rebuildProviderMenu()
         Logger.shared.log("Provider switched to \(provider.displayName)")
+
+        // Guided setup: picking an unready provider offers the key right away
+        // instead of failing at first translation
+        if !provider.isReady {
+            promptForMissingKey(provider)
+        }
+    }
+
+    func promptForMissingKey(_ provider: TranslationProvider) {
+        let alert = NSAlert()
+        alert.messageText = "\(provider.displayName) needs an API key"
+        alert.informativeText = "Copy your key, then click \"Paste from Clipboard\" — or open the key page first."
+        alert.addButton(withTitle: "Paste from Clipboard")
+        alert.addButton(withTitle: "Open Key Page")
+        alert.addButton(withTitle: "Later")
+
+        NSApp.activate(ignoringOtherApps: true)
+        alert.layout()
+        alert.window.level = .floating
+
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            saveAPIKeyFromClipboard(for: provider)
+        case .alertSecondButtonReturn:
+            if let url = URL(string: provider.apiKeyURL) {
+                NSWorkspace.shared.open(url)
+            }
+        default:
+            break
+        }
+        rebuildProviderMenu()
+    }
+
+    @objc func editProvidersConfig(_ sender: NSMenuItem) {
+        _ = ProviderConfig.endpoint(for: .gemini)  // ensures the file exists
+        NSWorkspace.shared.open(ProviderConfig.configURL)
     }
 
     @objc func pasteAPIKey(_ sender: NSMenuItem) {
-        let provider = TranslationService.currentProvider
+        saveAPIKeyFromClipboard(for: TranslationService.currentProvider)
+        rebuildProviderMenu()
+    }
+
+    func saveAPIKeyFromClipboard(for provider: TranslationProvider) {
         if let key = NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty {
             UserDefaults.standard.set(key, forKey: provider.defaultsKey)
 

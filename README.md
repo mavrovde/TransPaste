@@ -111,7 +111,7 @@ export ANTHROPIC_API_KEY=your_key   # Anthropic Claude
 
 #### Option B — Paste via the App Menu
 
-After launching the app, pick your provider under **Provider** in the menu bar dropdown, copy your API key to the clipboard, and click **"Paste <Provider> API Key"**. Each provider's key is stored separately.
+After launching the app, open **Provider** in the menu bar dropdown and pick your provider — if it needs an API key you'll be offered to paste one from the clipboard (or open the provider's key page) immediately. Keys are stored separately per provider; providers missing a key are marked right in the menu.
 
 ### 3. Build the Application
 
@@ -179,11 +179,8 @@ Look for the 💬 speech bubble icon in your menu bar.
 |---|---|
 | **Source: \<language\>** | Choose the input language (or Auto-detect). Default: Russian |
 | **Target: \<language\>** | Choose the output language. Default: German |
-| **Provider: \<name\>** | Choose the AI provider (Gemini, OpenAI, Claude, Ollama, or Custom). Default: Gemini |
-| **Configure Custom Provider…** | Set the endpoint URL and model name for any OpenAI-compatible server (defaults to local Ollama at `http://localhost:11434/v1/chat/completions`) |
+| **Provider: \<name\>** | Everything provider-related in one submenu: pick a provider (a `— needs API key` suffix marks unready ones; the top-level title shows ⚠ too), then contextual actions for the selected provider — **Paste API Key from Clipboard**, **Get \<Provider\> API Key…**, **Configure Endpoint & Model…** (Custom only), and **Edit providers.json…**. Picking a provider without a key offers to paste one or open its key page right away. Default: Gemini |
 | **Enable Translation** | Toggle the hotkey on/off (`Ctrl+Cmd+T`) — the menu bar icon dims while disabled |
-| **Paste \<Provider\> API Key** | Save the current provider's API key from your clipboard |
-| **Get API Key…** | Opens the current provider's API key page |
 | **Check Permissions** | Re-checks Accessibility permissions and starts the input monitor |
 | **About TransPaste** | Version, author, active provider/model, and config/log paths |
 | **Quit** | Exits the application (`Cmd+Q`) |

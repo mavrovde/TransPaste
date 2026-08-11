@@ -338,6 +338,31 @@ func runTranslationServiceTests() {
         }
     }
 
+    test("readiness: key-less providers are always ready") {
+        expect(TranslationProvider.ollama.isReady, "Ollama is ready without a key")
+        expect(TranslationProvider.custom.isReady, "Custom is ready without a key")
+    }
+
+    if ProcessInfo.processInfo.environment["OPENAI_API_KEY"] != nil {
+        skip("readiness: keyed provider follows stored key",
+             reason: "OPENAI_API_KEY is set in this environment")
+    } else {
+        test("readiness: keyed provider follows stored key") {
+            let previous = UserDefaults.standard.string(forKey: TranslationProvider.openai.defaultsKey)
+            defer {
+                if let previous = previous {
+                    UserDefaults.standard.set(previous, forKey: TranslationProvider.openai.defaultsKey)
+                } else {
+                    UserDefaults.standard.removeObject(forKey: TranslationProvider.openai.defaultsKey)
+                }
+            }
+            UserDefaults.standard.removeObject(forKey: TranslationProvider.openai.defaultsKey)
+            expect(!TranslationProvider.openai.isReady, "OpenAI without a key is not ready")
+            UserDefaults.standard.set("KEY", forKey: TranslationProvider.openai.defaultsKey)
+            expect(TranslationProvider.openai.isReady, "OpenAI with a key is ready")
+        }
+    }
+
     test("provider selection defaults to Gemini and persists") {
         let previous = UserDefaults.standard.string(forKey: TranslationService.providerDefaultsKey)
         UserDefaults.standard.removeObject(forKey: TranslationService.providerDefaultsKey)
