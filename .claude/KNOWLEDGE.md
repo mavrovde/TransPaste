@@ -92,5 +92,9 @@ debugging build, permission, or CI problems.
 5. Update README + CLAUDE.md in the same PR when behavior changes.
 6. Push, open PR, wait for CI green (Build → Test → Package) + CodeQL.
 7. Merge; post-merge CI on `main` must also go green.
-8. "Deploy" = users pull and run `./build.sh`; if the bundle ID changed,
-   the release notes must say to re-run `./automated_setup.sh`.
+8. Release = tag push (`git tag v<X.Y.Z> && git push origin v<X.Y.Z>`) —
+   `.github/workflows/release.yml` tests, builds, packages (zip + sha256), and
+   publishes the GitHub release with generated notes (categories from
+   `.github/release.yml`, install footer from `.github/RELEASE_FOOTER.md`).
+   The workflow fails if the tag doesn't match `AppInfo.version`. If the
+   bundle ID/signing changed, note the permission re-grant in the release.
