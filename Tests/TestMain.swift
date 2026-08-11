@@ -14,6 +14,7 @@ struct TestMain {
         runInputMonitorTests()
         runLoggerTests()
         runAppInfoTests()
+        runMessagesTests()
         TestKit.summaryAndExit()
     }
 }

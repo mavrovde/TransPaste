@@ -363,6 +363,22 @@ func runTranslationServiceTests() {
         }
     }
 
+    test("every TranslationError case has a human-readable message") {
+        let samples: [TranslationError] = [
+            .noAPIKey,
+            .invalidURL,
+            .networkError(NSError(domain: NSURLErrorDomain, code: NSURLErrorCannotConnectToHost)),
+            .decodingError(NSError(domain: "test", code: 1)),
+            .apiError("API Error: quota exceeded"),
+        ]
+        for error in samples {
+            let message = error.localizedDescription
+            expect(!message.contains("TranslationError error"),
+                   "raw enum leaked into user-facing message: \(message)")
+            expect(message.count > 15, "message too terse to act on: \(message)")
+        }
+    }
+
     test("provider selection defaults to Gemini and persists") {
         let previous = UserDefaults.standard.string(forKey: TranslationService.providerDefaultsKey)
         UserDefaults.standard.removeObject(forKey: TranslationService.providerDefaultsKey)

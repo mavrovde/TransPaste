@@ -145,7 +145,7 @@ The app requires two macOS permissions:
 ./automated_setup.sh
 ```
 
-This script resets existing permissions, opens System Settings to the correct pane, reveals the app in Finder for drag-and-drop, and then launches the app once you confirm.
+This script resets existing permissions, opens System Settings to the correct pane, reveals the app in Finder for drag-and-drop, and then launches the app once you confirm. TransPaste also detects the Accessibility grant **automatically** — no relaunch needed after toggling it on.
 
 **Manual setup:**
 
