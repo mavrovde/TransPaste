@@ -73,6 +73,16 @@ debugging build, permission, or CI problems.
   tests; see `.claude/skills/add-provider/SKILL.md`. Check OpenAI-compatibility
   first — the Custom provider may already cover it.
 
+## Project tooling map
+
+- Agents: `swift-reviewer` (pre-PR review vs repo constraints), `ci-doctor`
+  (failing/stuck workflow runs), `docs-sync` (docs vs code truthfulness).
+- Skills: `ship` (implement→test→PR→green), `release` (version/tag/GitHub
+  release), `add-provider`, `bump-models` (default model/endpoint refresh),
+  `troubleshoot` (runtime symptom→fix map).
+- Plugins (project-enabled): context7 (live API docs — use for provider model
+  drift), code-review, commit-commands, claude-md-management.
+
 ## Workflow: implement → test → deploy
 
 1. Branch from `main` (never commit to `main` directly).
