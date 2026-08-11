@@ -13,8 +13,9 @@ GitHub release with auto-generated notes + install footer).
    (`gh run list --branch main --limit 1`).
 2. **Bump the version** in `Sources/AppInfo.swift` AND the repo-root
    `Info.plist` (a test asserts they match; build.sh injects into the bundle):
-   - PATCH: fixes, docs, internal refactors
-   - MINOR: new user-visible features (new provider, new menu item)
+   - PATCH: fixes, docs, internal refactors, and cosmetic changes (icon,
+     wording, visual tweaks) — user-confirmed convention 2026-08-11
+   - MINOR: new user-visible *functionality* (new provider, new menu action)
    - MAJOR: breaking changes (bundle ID change, providers.json format change)
 3. **Verify**: `./test.sh` && `./build.sh` && `swift build`.
 4. **Ship the bump** via a PR (see the `ship` skill) — never commit to `main`.
