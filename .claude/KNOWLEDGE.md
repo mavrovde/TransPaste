@@ -112,7 +112,11 @@ debugging build, permission, or CI problems.
 5. Update README + CLAUDE.md in the same PR when behavior changes.
 6. Push, open PR, wait for CI green (Build → Test → Package) + CodeQL.
 7. Merge; post-merge CI on `main` must also go green.
-8. Release = tag push (`git tag v<X.Y.Z> && git push origin v<X.Y.Z>`) —
+8. Semver convention (user-set): cosmetic = PATCH (icon, wording); MINOR only
+   for functional features. A mistagged unpublished release is recoverable:
+   cancel the Release run, delete the tag (git push origin :refs/tags/vX),
+   re-version via PR, re-tag (done for the aborted v1.4.0 → v1.3.1).
+9. Release = tag push (`git tag v<X.Y.Z> && git push origin v<X.Y.Z>`) —
    `.github/workflows/release.yml` tests, builds, packages (zip + DMG + sha256s), and
    publishes the GitHub release with generated notes (categories from
    `.github/release.yml`, install footer from `.github/RELEASE_FOOTER.md`).
