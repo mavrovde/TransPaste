@@ -54,6 +54,11 @@ debugging build, permission, or CI problems.
   paths filter (Swift/build inputs only), concurrency cancel-in-progress,
   weekly full scan. If Build sits "queued" for many minutes, suspect runner
   starvation — `gh run list` and cancel redundant scans first.
+- The app icon is **generated as code** (`tools/generate_icon.swift`, AppKit
+  drawing → iconset → `iconutil` → `build/AppIcon.icns`, cached; build.sh
+  regenerates when missing). No binary image assets in the repo — edit the
+  Swift file to change the design, delete `build/AppIcon.icns` to force
+  regeneration. Preview renders can be visually checked by Reading a PNG.
 - Release publishing is `.github/workflows/release.yml` on `v*` tags: guard
   (tag == AppInfo.version) → test → signed build → zip + DMG (`package_dmg.sh`:
   app + /Applications symlink, UDZO) + sha256s → release with generated notes.

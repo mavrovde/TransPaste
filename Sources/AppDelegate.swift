@@ -418,7 +418,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, InputMonitor
         let alert = NSAlert()
         alert.messageText = "\(AppInfo.name) \(AppInfo.version)"
         alert.informativeText = """
-        On-the-fly translation for macOS — press Ctrl+Cmd+T in any app.
+        Instant in-place translation for macOS: select text anywhere, press Ctrl+Cmd+T, and the translation lands right back where you're working.
 
         Provider: \(provider.displayName) (\(provider.model))
         Config: ~/.transpaste/providers.json

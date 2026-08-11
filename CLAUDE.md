@@ -12,6 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./build.sh          # Compiles Sources/*.swift with swiftc -O into build/TransPaste.app, copies Info.plist, ad-hoc codesigns
 ./test.sh           # Compiles and runs the full test suite
 ./test.sh "API key" # Run only tests whose name matches the filter (case-insensitive substring)
+./tools/generate_icon.sh # Renders the app icon (icon-as-code) to build/AppIcon.icns; build.sh runs it when missing
 ./package_dmg.sh    # Builds build/TransPaste-<version>.dmg (drag-to-Applications installer; runs build.sh if needed)
 swift build         # SPM build (bare executable in .build/ — not an .app bundle, permissions won't work)
 open build/TransPaste.app          # Launch (menu bar icon only; LSUIElement=true, no Dock icon)

@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/mavrovde/TransPaste/actions/workflows/ci.yml/badge.svg)](https://github.com/mavrovde/TransPaste/actions/workflows/ci.yml)
 
-A lightweight macOS **menu bar app** that translates text on the fly using **your choice of AI provider — Google Gemini, OpenAI, Anthropic Claude, local Ollama, or any OpenAI-compatible endpoint**. Press a global hotkey, confirm the captured text, and the translated result is pasted right back into your active application — no window switching required.
+A lightweight macOS **menu bar app** for **instant in-place translation** with **your choice of AI provider — Google Gemini, OpenAI, Anthropic Claude, local Ollama, or any OpenAI-compatible endpoint**. Select text anywhere, press the global hotkey, confirm — and the translation lands right back where you're working. No window switching, no copy-paste juggling.
 
 ---
 
@@ -44,6 +44,7 @@ translator/
 ├── .github/workflows/              # CI (build → test → package), CodeQL, release publishing
 ├── Info.plist                      # App bundle metadata (LSUIElement = true)
 ├── Package.swift                   # Swift Package Manager manifest
+├── tools/generate_icon.swift       # App icon, generated as code (no binary assets)
 ├── build.sh                        # Compiles and code-signs the .app bundle
 ├── package_dmg.sh                  # Builds the drag-to-Applications DMG installer
 ├── test.sh                         # Compiles and runs the test suite
@@ -123,10 +124,11 @@ After launching the app, open **Provider** in the menu bar dropdown and pick you
 ```
 
 This will:
-1. Compile all Swift source files with optimizations (`-O`)
-2. Create the app bundle at `build/TransPaste.app`
-3. Copy `Info.plist` into the bundle and sync its version from `Sources/AppInfo.swift`
-4. Ad-hoc code-sign the bundle for stable identity
+1. Generate the app icon (`tools/generate_icon.swift` → `AppIcon.icns`, cached in `build/`)
+2. Compile all Swift source files with optimizations (`-O`)
+3. Create the app bundle at `build/TransPaste.app`
+4. Copy `Info.plist` into the bundle and sync its version from `Sources/AppInfo.swift`
+5. Ad-hoc code-sign the bundle for stable identity
 
 ### 4. Grant Permissions
 
