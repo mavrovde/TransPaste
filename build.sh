@@ -10,6 +10,12 @@ RESOURCES_DIR="${CONTENTS_DIR}/Resources"
 mkdir -p "${MACOS_DIR}"
 mkdir -p "${RESOURCES_DIR}"
 
+# App icon — generated as code (tools/generate_icon.swift), cached in build/
+if [ ! -f build/AppIcon.icns ]; then
+    ./tools/generate_icon.sh
+fi
+cp build/AppIcon.icns "${RESOURCES_DIR}/AppIcon.icns"
+
 # Compile
 swiftc -O Sources/*.swift -o "${MACOS_DIR}/${APP_NAME}"
 

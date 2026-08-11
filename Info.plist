@@ -6,10 +6,12 @@
     <string>com.mavrovde.transpaste</string>
     <key>CFBundleName</key>
     <string>TransPaste</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.3.0</string>
+    <string>1.4.0</string>
     <key>CFBundleVersion</key>
-    <string>1.3.0</string>
+    <string>1.4.0</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSPrincipalClass</key>

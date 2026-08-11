@@ -18,6 +18,8 @@ func runAppInfoTests() {
         }
         expect(plist.contains("<string>\(AppInfo.version)</string>"),
                "Info.plist must carry AppInfo.version \(AppInfo.version) (build.sh keeps the bundle in sync)")
+        expect(plist.contains("<key>CFBundleIconFile</key>"),
+               "Info.plist must reference the generated AppIcon")
     }
 }
 

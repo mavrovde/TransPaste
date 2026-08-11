@@ -44,6 +44,7 @@ translator/
 ├── .github/workflows/              # CI (build → test → package), CodeQL, release publishing
 ├── Info.plist                      # App bundle metadata (LSUIElement = true)
 ├── Package.swift                   # Swift Package Manager manifest
+├── tools/generate_icon.swift       # App icon, generated as code (no binary assets)
 ├── build.sh                        # Compiles and code-signs the .app bundle
 ├── package_dmg.sh                  # Builds the drag-to-Applications DMG installer
 ├── test.sh                         # Compiles and runs the test suite
@@ -123,10 +124,11 @@ After launching the app, open **Provider** in the menu bar dropdown and pick you
 ```
 
 This will:
-1. Compile all Swift source files with optimizations (`-O`)
-2. Create the app bundle at `build/TransPaste.app`
-3. Copy `Info.plist` into the bundle and sync its version from `Sources/AppInfo.swift`
-4. Ad-hoc code-sign the bundle for stable identity
+1. Generate the app icon (`tools/generate_icon.swift` → `AppIcon.icns`, cached in `build/`)
+2. Compile all Swift source files with optimizations (`-O`)
+3. Create the app bundle at `build/TransPaste.app`
+4. Copy `Info.plist` into the bundle and sync its version from `Sources/AppInfo.swift`
+5. Ad-hoc code-sign the bundle for stable identity
 
 ### 4. Grant Permissions
 
