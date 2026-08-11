@@ -82,6 +82,12 @@ graph LR
 
 ## 🚀 Getting Started
 
+### Option 1 — Download a Release (easiest)
+
+Grab the latest `TransPaste-<version>.zip` from the [Releases page](https://github.com/mavrovde/TransPaste/releases), unzip, and launch. The app is ad-hoc signed, so on first launch right-click → **Open** (or `xattr -d com.apple.quarantine TransPaste.app`). Then continue at step 4 below for permissions.
+
+### Option 2 — Build from Source
+
 ### 1. Clone the Repository
 
 ```bash
@@ -220,6 +226,8 @@ Every push and pull request to `main` runs the [CI workflow](.github/workflows/c
 1. **Build** — compiles the app bundle and verifies the code signature
 2. **Test** — runs the full test suite
 3. **Package** — zips `TransPaste.app` and uploads it as a downloadable artifact (30-day retention)
+
+Pushing a `v*` tag additionally runs the [Release workflow](.github/workflows/release.yml): it verifies the tag matches `AppInfo.version`, re-runs tests and the signed build, and publishes a GitHub release with the zipped app, a SHA-256 checksum, and auto-generated notes.
 
 ### Project Configuration
 

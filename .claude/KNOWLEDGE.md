@@ -76,10 +76,15 @@ debugging build, permission, or CI problems.
 ## Project tooling map
 
 - Agents: `swift-reviewer` (pre-PR review vs repo constraints), `ci-doctor`
-  (failing/stuck workflow runs), `docs-sync` (docs vs code truthfulness).
-- Skills: `ship` (implement→test→PR→green), `release` (version/tag/GitHub
-  release), `add-provider`, `bump-models` (default model/endpoint refresh),
-  `troubleshoot` (runtime symptom→fix map).
+  (failing/stuck workflow runs), `docs-sync` (docs vs code truthfulness),
+  `release-manager` (release gates: preflight, tag, post-publish validation),
+  `dependabot-triage` (dependency PRs: breaking-change mapping, missed-file
+  sweeps, safe merge).
+- Skills: `ship` (implement→test→PR→green), `release` (bump PR → tag →
+  automated publish), `verify-release` (assets/checksum/signature/version
+  audit), `hotfix` (minimal fix → patch release fast path), `add-provider`,
+  `bump-models` (default model/endpoint refresh), `troubleshoot` (runtime
+  symptom→fix map).
 - Plugins (project-enabled): context7 (live API docs — use for provider model
   drift), code-review, commit-commands, claude-md-management.
 
@@ -92,5 +97,9 @@ debugging build, permission, or CI problems.
 5. Update README + CLAUDE.md in the same PR when behavior changes.
 6. Push, open PR, wait for CI green (Build → Test → Package) + CodeQL.
 7. Merge; post-merge CI on `main` must also go green.
-8. "Deploy" = users pull and run `./build.sh`; if the bundle ID changed,
-   the release notes must say to re-run `./automated_setup.sh`.
+8. Release = tag push (`git tag v<X.Y.Z> && git push origin v<X.Y.Z>`) —
+   `.github/workflows/release.yml` tests, builds, packages (zip + sha256), and
+   publishes the GitHub release with generated notes (categories from
+   `.github/release.yml`, install footer from `.github/RELEASE_FOOTER.md`).
+   The workflow fails if the tag doesn't match `AppInfo.version`. If the
+   bundle ID/signing changed, note the permission re-grant in the release.

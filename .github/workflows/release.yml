@@ -1,0 +1,55 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Publish
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Verify tag matches AppInfo version
+        run: |
+          VERSION=$(grep -o 'version = "[^"]*"' Sources/AppInfo.swift | cut -d'"' -f2)
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$VERSION" != "$TAG" ]; then
+            echo "::error::AppInfo.swift version ($VERSION) does not match tag ($TAG) — bump Sources/AppInfo.swift first"
+            exit 1
+          fi
+
+      - name: Test
+        run: ./test.sh
+
+      - name: Build app bundle
+        run: ./build.sh
+
+      - name: Verify code signature
+        run: codesign --verify --verbose build/TransPaste.app
+
+      - name: Package with checksum
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ditto -c -k --keepParent build/TransPaste.app "build/TransPaste-${VERSION}.zip"
+          cd build && shasum -a 256 "TransPaste-${VERSION}.zip" > "TransPaste-${VERSION}.zip.sha256"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+            -f tag_name="$GITHUB_REF_NAME" --jq .body > notes.md
+          printf '\n\n' >> notes.md
+          cat .github/RELEASE_FOOTER.md >> notes.md
+          gh release create "$GITHUB_REF_NAME" \
+            "build/TransPaste-${VERSION}.zip" \
+            "build/TransPaste-${VERSION}.zip.sha256" \
+            --title "TransPaste ${VERSION}" \
+            --notes-file notes.md
