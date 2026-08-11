@@ -1,15 +1,36 @@
 name: CodeQL
 
+# Swift analysis takes ~30 min on a macOS runner and personal accounts have a
+# small concurrent-runner pool, so scans are strictly rationed:
+# - only when Swift code or build inputs actually change (paths filter)
+# - superseded runs cancel automatically (concurrency group)
+# - weekly full scan as the safety net
 on:
   push:
     branches: [main]
+    paths:
+      - 'Sources/**'
+      - 'Tests/**'
+      - 'Package.swift'
+      - 'build.sh'
+      - '.github/workflows/codeql.yml'
   pull_request:
     branches: [main]
+    paths:
+      - 'Sources/**'
+      - 'Tests/**'
+      - 'Package.swift'
+      - 'build.sh'
+      - '.github/workflows/codeql.yml'
   schedule:
     - cron: '30 5 * * 1'
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   analyze:
@@ -20,7 +41,7 @@ jobs:
       security-events: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
